@@ -2,6 +2,8 @@
 #include<stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 /*
 * Assignment 1 part 2 - xsort.c
 * 14CS30011 : Hiware Kaustubh Narendra
@@ -36,9 +38,24 @@ int main(int argc,char* argv[])
     strcpy(loc_sort,path);
     strcat(loc_sort,"/sort1");
 
-    // initial method for terminal execution
-    //ret = execlp(loc_sort,"/sort1",filename,(char  *) NULL);
-    // open xterm and hold until user exits with Ctrl+C
-    ret = execl("/usr/bin/xterm", "/usr/bin/xterm", "-hold", "-e",loc_sort,filename, (void*)NULL);
+    int id,status = 0;
+    id = fork();
+    if(id == 0)
+    {
+        // initial method for terminal execution
+        //ret = execlp(loc_sort,"/sort1",filename,(char  *) NULL);
+        // open xterm and hold until user exits with Ctrl+C
+        ret = execl("/usr/bin/xterm", "/usr/bin/xterm", "-hold", "-e",loc_sort,filename, (void*)NULL);
+
+        // in case of error , print
+        perror("Execl failed :/ \n");
+        exit(-1);
+    }
+    else
+    {
+        // parent process - wait for child to finish
+        wait(&status);
+        printf("xterm display now exitting ; exit status of child = %d\n",status);
+    }
 
 }
