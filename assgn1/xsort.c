@@ -6,9 +6,12 @@
 * Assignment 1 part 2 - xsort.c
 * 14CS30011 : Hiware Kaustubh Narendra
 */
-
-/* run sort1.c
-* Usage - xsort <filename>
+/* run sort1 in a seperate xterm when invoked from terminal
+*/
+/* get sort1 executable first - gcc sort1.c -o sort1
+*  create xsort executable then - gcc xsort.c -o xsort
+*  Usage - ./xsort <filename> in current dir
+*  PATH can be absolute or file must be in same folder as current working dir
 */
 int main(int argc,char* argv[])
 {
@@ -32,7 +35,9 @@ int main(int argc,char* argv[])
     strcpy(loc_sort,path);
     strcat(loc_sort,"/sort1");
 
-    //ret = execl(getcwd(cwd, sizeof(cwd)), "./sort1",filename,(char *)0);
-    ret = execlp(loc_sort,"./sort1",filename,(char  *) NULL);
+    // initial method for terminal execution
+    //ret = execlp(loc_sort,"/sort1",filename,(char  *) NULL);
+    // open xterm and hold until user exits with Ctrl+C
+    ret = execl("/usr/bin/xterm", "/usr/bin/xterm", "-hold", "-e",loc_sort,filename, (void*)NULL);
 
 }

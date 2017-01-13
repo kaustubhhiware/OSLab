@@ -8,10 +8,8 @@
 /* take filename as a command line parameter and read array of integers from it
 * print the sorted array using mergesort
 */
-
-//executable -  gcc sort1.c -o sort1
-// ./sort1 filename
-// cc -o sort1 sort1.c
+// executable first-  gcc sort1.c -o sort1
+// usage - ./sort1 filename
 
 void merge(int a[], int l, int m, int r);
 void mergeSort(int a[], int l, int r);
@@ -35,7 +33,7 @@ int main(int argc,char* argv[])
     fp = fopen(filename,"r");
     if(fp == NULL)
     {
-        printf("File %s does not exist!Exitting...",filename);
+        printf("File %s does not exist!Exitting...\n",filename);
         exit(0);
     }
     // array of integers - stop at first float taking its integer value
@@ -45,7 +43,7 @@ int main(int argc,char* argv[])
     }
     fclose(fp);
     n = i;
-    printf("+--- Array from file :" );
+    printf("+--- Array from file : " );
     for(i = 0; i < n ; i++)
     {
         printf("%d ",a[i]);
@@ -53,11 +51,12 @@ int main(int argc,char* argv[])
     printf("\n");
 
     mergeSort(a, 0, n - 1);
-    printf("\n+--- Sorted array is :");
+    printf("\n+--- Sorted array is : ");
     for( i = 0;i < n; i++)
     {
         printf("%d ",a[i]);
     }
+    printf("\n");
 }
 
 void merge(int a[], int l, int m, int r)
