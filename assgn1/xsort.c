@@ -28,6 +28,7 @@ int main(int argc,char* argv[])
     if(fp == NULL)
     {
         printf("File %s does not exist!\n",filename);
+        exit(0);
     }
     fclose(fp);
     char* path = getcwd(cwd, sizeof(cwd)); // current folder
