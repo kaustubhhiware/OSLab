@@ -20,15 +20,19 @@
 */
 int main(int argc,char* argv[])
 {
-    int file1,file2;
-    char line[BUFSIZE], line1[BUFSIZE], line2[BUFSIZE];
+    int file1,file2,details = 0;
+    char line1[2*BUFSIZE], line2[2*BUFSIZE], stat[2*BUFSIZE];
     
     if(argc < 3)
     {
         printf("\n+--- Insufficient arguments! Use - ./a.out file1 file2\n");
         exit(0);    
     }
-
+    if(argc > 3)
+    {
+        sscanf(argv[3],"%d",&details);
+    }
+    
     file1 = open( argv[1], O_RDONLY);
     file2 = open( argv[2], O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     // Create new file if absent. File2 created must be accessible to user. 
@@ -47,14 +51,12 @@ int main(int argc,char* argv[])
     }
     
     int fd[2],fe[2]; // file descriptors for 2 pipes
-    int pipe1,pipe2;
-    pipe1 = pipe(fd);
-    pipe2 = pipe(fe);
+
     // parent process creates 2 pipes
-    if(pipe1 == -1 || pipe2 == -1)
+    if(pipe(fd) == -1 || pipe(fe) == -1)
     {
         perror("\n+--- Pipe error : ");
-        exit(EXIT_FAILURE);
+        exit(1);
     }
     
     int id = fork();
@@ -66,19 +68,24 @@ int main(int argc,char* argv[])
             close( fd[1]); // not writing into file1
             close( fe[0]); // not reading to file2, only send status to parent
             
-            int r = read( fd[1], line1, 100);
-            int w = write( file2, line1, r); // append to current file2 progress
+            int rc = read( fd[0], line2, BUFSIZE);
+            int wc = write( file2, line2, rc); // append to current file2 progress
             
-            if(w < 0)
+            if(details == 1)
+            {
+                printf("\nline2 : %s\n",line2);
+            }
+            
+            if(wc < 0)
             {
                 // complain to parent you failed
                 int error_back = write( fe[1], "-1", 2); 
-                printf("+--- Could not write to file2.");
+                printf("+--- Could not write to file2");
                 exit(-1);
             }
-            else if(w < 100) // w >=0 and bytes read is < 100
+            else if(wc < BUFSIZE) // w >=0 and bytes read is < 100
             {
-                printf("+--- File copied successfully! ");
+                printf("+--- File copied successfully! \n");
                 int success = write( fe[1], "0", 1); // return success execution
                 exit(1);
             }
@@ -88,41 +95,36 @@ int main(int argc,char* argv[])
             }
         }
     }
-    else if(id > 0)
+    else
     {
         //parent process
-        /*
-        The parent, on receiving 0, reads the next 100 bytes and repeats the 
-        process. It exits either on receiving a -1 from child, or on receiving 
-        a 0 after sending < 100 bytes for the last send (you can assume that 
-        the file size is not a multiple of 100 bytes, so the last send will have
-         < 100 bytes).       
-        */
         while(1)
         {
-        
             close(fd[0]); // not reading from file2
             close(fe[1]); // don't write to status report pipe
             
-            int r = read( file1, line, 100);
-            int w = read( file1, line, r);
+            int rp = read( file1, line1, BUFSIZE);
+            int wp = write( fd[1], line1, rp);
             
-            int status = read( fe[0], line2, 100);
+            if(details == 1)
+            {
+                printf("\nline1 : %s\n",line1);
+            }
+            
+            int status = read( fe[0], stat, BUFSIZE);
             
             if(status == 2)
             {
+                printf("+--- Parent exitting with error status\n");
                 exit(-1);            
             }
-            else if(status == 1 && r >=0 && r < 100)
+            else if(status == 1 && rp >=0 && rp < BUFSIZE)
             {
+                printf("+--- Parent exitting with success status\n");
                 exit(1);
             }
  
         }
         
     }
-
-
-
-
 }
