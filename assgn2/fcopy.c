@@ -21,7 +21,7 @@
 int main(int argc,char* argv[])
 {
     int file1,file2,details = 0;
-    char line1[2*BUFSIZE], line2[2*BUFSIZE], stat[2*BUFSIZE];
+    char line1[BUFSIZE], line2[BUFSIZE], stat[BUFSIZE];
     
     if(argc < 3)
     {
@@ -34,8 +34,9 @@ int main(int argc,char* argv[])
     }
     
     file1 = open( argv[1], O_RDONLY);
-    file2 = open( argv[2], O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    // Create new file if absent. File2 created must be accessible to user. 
+    file2 = open( argv[2], O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    // Truncate initial data if any .Create new file if absent
+    // File2 created must be accessible to user. 
 
     if(file1 < 0)
     {
@@ -53,7 +54,9 @@ int main(int argc,char* argv[])
     int fd[2],fe[2]; // file descriptors for 2 pipes
 
     // parent process creates 2 pipes
-    if(pipe(fd) == -1 || pipe(fe) == -1)
+    int pipe1 = pipe(fd);
+    int pipe2 = pipe(fe);
+    if(pipe1 == -1 || pipe2 == -1)
     {
         perror("\n+--- Pipe error : ");
         exit(1);
@@ -115,12 +118,12 @@ int main(int argc,char* argv[])
             
             if(status == 2)
             {
-                printf("+--- Parent exitting with error status\n");
+                printf("+--- Parent exitting with status -1\n");
                 exit(-1);            
             }
             else if(status == 1 && rp >=0 && rp < BUFSIZE)
             {
-                printf("+--- Parent exitting with success status\n");
+                printf("+--- Parent exitting with status 1\n");
                 exit(1);
             }
  
