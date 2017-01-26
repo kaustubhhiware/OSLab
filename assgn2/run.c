@@ -28,12 +28,12 @@ int main(int argc,char* argv[])
     id = fork();
 
     char* args[2];
-    args[0] = "";
+    args[0] = cmd;
     args[1] = "NULL";
     if(id == 0)
     {
         // open xterm and hold until user exits with Ctrl+C
-        ret = execvp(cmd,NULL);//,args);
+        ret = execvp(loc_sort, NULL);
         // in case of error , print
         perror("Execvp failed :/ \n");
         exit(-1);
@@ -42,7 +42,7 @@ int main(int argc,char* argv[])
     {
         // parent process - wait for child to finish
         wait(&status);
-        printf("Closed shell, exit status = %d\n",status);
+        printf("+--- Closed shell, exit status = %d\n",status);
     }
 
 }
