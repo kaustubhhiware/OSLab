@@ -12,9 +12,10 @@
 #include <time.h>
 #define BUFSIZE 1000
 #define ARGMAX 10
-#define GREEN  "\x1b[92m"
-#define BLUE  "\x1b[94m"
-#define DEF  "\x1B[0m"
+#define GREEN "\x1b[92m"
+#define BLUE "\x1b[94m"
+#define DEF "\x1B[0m"
+#define CYAN "\x1b[36m"
 // colour guide - https://github.com/shiena/ansicolor/blob/master/README.md
 /*
 * Assignment 2 part 2 - shell.c
@@ -38,28 +39,31 @@
 * Additional - clear
 * Additional - screenfetch
 */
-extern int alphasort();
 int exitflag = 0;
 char cwd[BUFSIZE];
 char* argval[ARGMAX]; // our local argc, argv
 int argcount = 0;
-void screenfetch();
+void screenfetch(int);
 void getInput();
 int function_exit();
-void function_pwd(char*,int);
+void function_pwd(char*, int);
 void function_cd(char*);
 void function_mkdir(char*);
 void function_rmdir(char*);
 void function_clear();
 void function_ls();
 void function_lsl();
+void function_cp(char*, char*);
 
 
-
-int main()
+int main(int argc, char* argv[])
 {
-    int i;
-    screenfetch();
+    int i,logo=0;// can change default logo here
+    if(argc > 1 && strcmp(argv[1],"1")==0)
+    {
+        logo = 1;
+    }
+    screenfetch(logo);
     function_pwd(cwd,0);
 
     while(exitflag==0)
@@ -74,7 +78,8 @@ int main()
         }
         else if(strcmp(argval[0],"screenfetch")==0)
         {
-           screenfetch();
+            if(strcmp(argval[1],"1")==0) screenfetch(1);
+            else screenfetch(0);
         }
         else if(strcmp(argval[0],"pwd")==0)
         {
@@ -108,9 +113,28 @@ int main()
             }
             else function_ls();
         }
-
+        else if(strcmp(argval[0],"cp")==0)
+        {
+            char* file1 = argval[1];
+            char* file2 = argval[2];
+            if(argcount < 3)
+            {
+                function_cp(file1,file2);
+            }
+            else
+            {
+                printf("+--- Error in cp : insufficient parameters\n");
+            }
+        }
 
     }
+
+}
+
+
+/* copy one file to another */
+void function_cp(char* file1, char* file2)
+{
 
 }
 
@@ -137,15 +161,19 @@ void function_ls()
             {
                 continue;
             }
-            else if(listr[i]-> d_type != DT_DIR)
+            else if(listr[i]-> d_type == DT_REG)
             {
                 printf("%s%s    ",BLUE, listr[i]->d_name);
             }
             else if(listr[i] -> d_type == DT_DIR)
             {
-                printf("%s%s    ",GREEN, listr[i]->d_name);
+                printf("%s%s/    ",GREEN, listr[i]->d_name);
             }
-            if(i%10==0) printf("\n");
+            else
+            {
+                printf("%s%s    ",CYAN, listr[i]->d_name);
+            }
+            if(i%8==0) printf("\n");
         }
         printf("\n");
         closedir (dir);
@@ -240,16 +268,15 @@ void function_pwd(char* cwdstr,int command)
 }
 
 /* mimic screenfetch like logo functionality from ubuntu*/
-void screenfetch()
+void screenfetch(int logo)
 {
-/*    char* welcomestr = "\n                           ./+o+-\n                  yyyyy- -yyyyyy+\n
-* ://+//////-yyyyyyo\n           .++ .:/++++++/-.+sss/`\n         .:++o:  /++++++++/:--:/-\n
-* o:+o+:++.`..```.-/oo+++++/\n       .:+o:+o/.          `+sssoo+/\n  .++/+:+oo+o:`             /sssooo.\n
-* /+++//+:`oo+o               /::--:.\n \\+/+o+++`o++o               ++////.\n  .++.o+++oo+:`
-* /dddhhh.\n       .+.o+oo:.          `oddhhhh+\n        \\+.++o+o``-````.:ohdhhhhh+\n         `:o+++
-* `ohhhhhhhhyo++os:\n           .o:`.syhhhhhhh/.oo++o`\n               /osyyyyyyo++ooo+++/\n
-* ````` +oo+++o\\:\n                          `oo++.\n\n";
-*/// Source - http://ascii.co.uk/art/seashell
-    char* welcomestr = "           _.-''|''-._\n        .-'     |     `-.\n      .'\\       |       /`.\n    .'   \\      |      /   `.\n    \\     \\     |     /     /\n     `\\    \\    |    /    /'\n       `\\   \\   |   /   /'\n         `\\  \\  |  /  /'\n        _.-`\\ \\ | / /'-._         Cshell\n       {_____`\\\\|//'_____}        Made by Kaustubh Hiware\n               `-'\n\n";
-    printf("%s",welcomestr);
+    char* welcomestr1 = "\n                           ./+o+-\n                  yyyyy- -yyyyyy+\n               ://+//////-yyyyyyo\n           .++ .:/++++++/-.+sss/`\n         .:++o:  /++++++++/:--:/-\n        o:+o+:++.`..```.-/oo+++++/\n       .:+o:+o/.          `+sssoo+/\n  .++/+:+oo+o:`             /sssooo.\n /+++//+:`oo+o               /::--:.\n \\+/+o+++`o++o               ++////.\n  .++.o+++oo+:`             /dddhhh.\n       .+.o+oo:.          `oddhhhh+\n        \\+.++o+o``-````.:ohdhhhhh+\n         `:o+++ `ohhhhhhhhyo++os:\n           .o:`.syhhhhhhh/.oo++o`\n               /osyyyyyyo++ooo+++/\n                   ````` +oo+++o\\:    CShell\n                          `oo++.    Made by Kaustubh Hiware\n\n";
+
+    // Source - http://ascii.co.uk/art/seashell
+    char* welcomestr2 = "           _.-''|''-._\n        .-'     |     `-.\n      .'\\       |       /`.\n    .'   \\      |      /   `.\n    \\     \\     |     /     /\n     `\\    \\    |    /    /'\n       `\\   \\   |   /   /'\n         `\\  \\  |  /  /'\n        _.-`\\ \\ | / /'-._         Cshell\n       {_____`\\\\|//'_____}        Made by Kaustubh Hiware\n               `-'\n\n";
+    if (logo==1)
+    {
+        printf("%s\n",welcomestr1);
+    }
+    else printf("%s",welcomestr2);
 }

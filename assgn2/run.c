@@ -22,6 +22,12 @@ int main(int argc,char* argv[])
     char loc_sort[1000]; // location of executable sort1
     strcpy(loc_sort,path);
     strcat(loc_sort,"/myshell");
+    char* logo="0";
+    if(argc > 1)
+    {
+        printf("Hi run\n");
+        logo = strdup("1");
+    }
 
     char* cmd = loc_sort;
     int id,status = 0;
@@ -32,11 +38,15 @@ int main(int argc,char* argv[])
     args[1] = "NULL";
     if(id == 0)
     {
-        // open xterm and hold until user exits with Ctrl+C
-        ret = execvp(loc_sort, NULL);
+        // open gnome-terminal and hold
+        // if you want parent to run, remove --disable-factory argument
+        ret = execlp("/usr/bin/gnome-terminal", "gnome-terminal", "--disable-factory", "-e", loc_sort,logo, NULL);
         // in case of error , print
-        perror("Execvp failed :/ \n");
-        exit(-1);
+        if(ret==-1)
+        {
+            perror("Execvp failed :/ \n");
+            exit(-1);
+        }
     }
     else
     {
