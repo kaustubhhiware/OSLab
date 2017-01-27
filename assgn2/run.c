@@ -22,12 +22,6 @@ int main(int argc,char* argv[])
     char loc_sort[1000]; // location of executable sort1
     strcpy(loc_sort,path);
     strcat(loc_sort,"/myshell");
-    char* logo="0";
-    if(argc > 1)
-    {
-        printf("Hi run\n");
-        logo = strdup("1");
-    }
 
     char* cmd = loc_sort;
     int id,status = 0;
@@ -40,7 +34,7 @@ int main(int argc,char* argv[])
     {
         // open gnome-terminal and hold
         // if you want parent to run, remove --disable-factory argument
-        ret = execlp("/usr/bin/gnome-terminal", "gnome-terminal", "--disable-factory", "-e", loc_sort,logo, NULL);
+        ret = execlp("/usr/bin/gnome-terminal", "gnome-terminal", "--disable-factory", "-e", loc_sort, NULL);
         // in case of error , print
         if(ret==-1)
         {

@@ -15,7 +15,7 @@
 #define GREEN "\x1b[92m"
 #define BLUE "\x1b[94m"
 #define DEF "\x1B[0m"
-#define CYAN "\x1b[36m"
+#define CYAN "\x1b[96m"
 // colour guide - https://github.com/shiena/ansicolor/blob/master/README.md
 /*
 * Assignment 2 part 2 - shell.c
@@ -43,7 +43,8 @@ int exitflag = 0;
 char cwd[BUFSIZE];
 char* argval[ARGMAX]; // our local argc, argv
 int argcount = 0;
-void screenfetch(int);
+void screenfetch();
+void about();
 void getInput();
 int function_exit();
 void function_pwd(char*, int);
@@ -51,6 +52,7 @@ void function_cd(char*);
 void function_mkdir(char*);
 void function_rmdir(char*);
 void function_clear();
+void nameFile(struct dirent*, char*);
 void function_ls();
 void function_lsl();
 void function_cp(char*, char*);
@@ -78,8 +80,11 @@ int main(int argc, char* argv[])
         }
         else if(strcmp(argval[0],"screenfetch")==0)
         {
-            if(strcmp(argval[1],"1")==0) screenfetch(1);
-            else screenfetch(0);
+            screenfetch();
+        }
+        else if(strcmp(argval[0],"about")==0)
+        {
+            about();
         }
         else if(strcmp(argval[0],"pwd")==0)
         {
@@ -138,45 +143,97 @@ void function_cp(char* file1, char* file2)
 
 }
 
+/* Just a fancy name printing function*/
+void nameFile(struct dirent* name,char* followup)
+{
+    if(name->d_type == DT_REG)    // regular file
+    {
+        printf("%s%s%s",BLUE, name->d_name, followup);
+    }
+    else if(name->d_type == DT_DIR)   // a directory
+    {
+        printf("%s%s/%s",GREEN, name->d_name, followup);
+    }
+    else                                    // unknown file types
+    {
+        printf("%s%s%s",CYAN, name->d_name, followup);
+    }
+}
+
 
 /*ls -l  lists date permissions etc*/
 void function_lsl()
 {
-    printf("Hello sweetie\n");
+    int i=0,total=0;
+    char timer[14];
+    struct dirent **listr;
+    struct stat details;
+    int listn = scandir(".",&listr,0,alphasort);
+    if(listn > 0)
+    {
+        printf("%s+--- Total %d objects in this directory\n",CYAN,listn-2);
+        for ( i = 0; i < listn; i++)
+        {
+            if(strcmp(listr[i]->d_name,".")==0 || strcmp(listr[i]->d_name,"..")==0)
+            {
+                continue;
+            }
+            else if(stat(listr[i]->d_name,&details)==0)
+            {
+                // example - -rwxrwxr-x 1 user user  8872 Jan 26 10:19 a.out*
+                // owner permissions - group permissions - other permissions
+                // links associated - owner name - group name
+                // file size (bytes) - time modified - name
+                total += details.st_blocks; // block size
+                // owner permissions - group permissions - other permissions
+                printf("%s%1s",DEF,(S_ISDIR(details.st_mode)) ? "d" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IRUSR) ? "r" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IWUSR) ? "w" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IXUSR) ? "x" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IRGRP) ? "r" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IWGRP) ? "w" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IXGRP) ? "x" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IROTH) ? "r" : "-");
+                printf("%s%1s",DEF,(details.st_mode & S_IWOTH) ? "w" : "-");
+                printf("%s%1s ",DEF,(details.st_mode & S_IXOTH) ? "x" : "-");
+                // links associated - owner name - group name
+                printf("%2ld ",(unsigned long)(details.st_nlink));
+                printf("%s ",(getpwuid(details.st_uid))->pw_name);
+                printf("%s ",(getgrgid(details.st_gid))->gr_name);
+                // file size (bytes) - time modified - name
+                printf("%5lld ",(unsigned long long)details.st_size);
+                strftime (timer,14,"%h %d %H:%M",localtime(&details.st_mtime));
+                printf("%s ",timer);
+                nameFile(listr[i],"\n");
+            }
+        }
+        printf("%s+--- Total %d object contents\n",CYAN,total/2);
+    }
+    else
+    {
+            printf("+--- Empty directory\n" );
+    }
 }
 
 /* list cwd contents*/
 void function_ls()
 {
-    DIR *dir = opendir(cwd);
     int i=0;
     struct dirent **listr;
     int listn = scandir(".", &listr, 0, alphasort);
     if (listn >= 0)
     {
-        printf("+--- Total %d objects in this directory\n",listn-2);
+        printf("%s+--- Total %d objects in this directory\n",CYAN,listn-2);
         for(i = 0; i < listn; i++ )
         {
             if(strcmp(listr[i]->d_name,".")==0 || strcmp(listr[i]->d_name,"..")==0)
             {
                 continue;
             }
-            else if(listr[i]-> d_type == DT_REG)
-            {
-                printf("%s%s    ",BLUE, listr[i]->d_name);
-            }
-            else if(listr[i] -> d_type == DT_DIR)
-            {
-                printf("%s%s/    ",GREEN, listr[i]->d_name);
-            }
-            else
-            {
-                printf("%s%s    ",CYAN, listr[i]->d_name);
-            }
+            else nameFile(listr[i],"    ");
             if(i%8==0) printf("\n");
         }
         printf("\n");
-        closedir (dir);
     }
     else
     {
@@ -258,7 +315,7 @@ void function_pwd(char* cwdstr,int command)
     if(path != NULL)
     {
         strcpy(cwdstr,temp);
-        if(command==1)
+        if(command==1)  // check if pwd is to be printed
         {
             printf("%s\n",cwdstr);
         }
@@ -268,15 +325,19 @@ void function_pwd(char* cwdstr,int command)
 }
 
 /* mimic screenfetch like logo functionality from ubuntu*/
-void screenfetch(int logo)
+void screenfetch()
 {
-    char* welcomestr1 = "\n                           ./+o+-\n                  yyyyy- -yyyyyy+\n               ://+//////-yyyyyyo\n           .++ .:/++++++/-.+sss/`\n         .:++o:  /++++++++/:--:/-\n        o:+o+:++.`..```.-/oo+++++/\n       .:+o:+o/.          `+sssoo+/\n  .++/+:+oo+o:`             /sssooo.\n /+++//+:`oo+o               /::--:.\n \\+/+o+++`o++o               ++////.\n  .++.o+++oo+:`             /dddhhh.\n       .+.o+oo:.          `oddhhhh+\n        \\+.++o+o``-````.:ohdhhhhh+\n         `:o+++ `ohhhhhhhhyo++os:\n           .o:`.syhhhhhhh/.oo++o`\n               /osyyyyyyo++ooo+++/\n                   ````` +oo+++o\\:    CShell\n                          `oo++.    Made by Kaustubh Hiware\n\n";
+    char* welcomestr = "\n                           ./+o+-\n                  yyyyy- -yyyyyy+\n               ://+//////-yyyyyyo\n           .++ .:/++++++/-.+sss/`\n         .:++o:  /++++++++/:--:/-\n        o:+o+:++.`..```.-/oo+++++/\n       .:+o:+o/.          `+sssoo+/\n  .++/+:+oo+o:`             /sssooo.\n /+++//+:`oo+o               /::--:.\n \\+/+o+++`o++o               ++////.\n  .++.o+++oo+:`             /dddhhh.\n       .+.o+oo:.          `oddhhhh+\n        \\+.++o+o``-````.:ohdhhhhh+\n         `:o+++ `ohhhhhhhhyo++os:\n           .o:`.syhhhhhhh/.oo++o`\n               /osyyyyyyo++ooo+++/\n                   ````` +oo+++o\\:    CShell\n                          `oo++.    Made by Kaustubh Hiware\n\n";
 
+    printf("%s",welcomestr);
+}
+
+
+/* about this shell*/
+void about()
+{
     // Source - http://ascii.co.uk/art/seashell
-    char* welcomestr2 = "           _.-''|''-._\n        .-'     |     `-.\n      .'\\       |       /`.\n    .'   \\      |      /   `.\n    \\     \\     |     /     /\n     `\\    \\    |    /    /'\n       `\\   \\   |   /   /'\n         `\\  \\  |  /  /'\n        _.-`\\ \\ | / /'-._         Cshell\n       {_____`\\\\|//'_____}        Made by Kaustubh Hiware\n               `-'\n\n";
-    if (logo==1)
-    {
-        printf("%s\n",welcomestr1);
-    }
-    else printf("%s",welcomestr2);
+    char* descr = "           _.-''|''-._\n        .-'     |     `-.\n      .'\\       |       /`.\n    .'   \\      |      /   `.        Cshell\n    \\     \\     |     /     /        Made by @kaustubhhiware\n     `\\    \\    |    /    /'\n       `\\   \\   |   /   /'\n         `\\  \\  |  /  /'\n        _.-`\\ \\ | / /'-._ \n       {_____`\\\\|//'_____}\n               `-'\n\n";
+
+    printf("%s",descr);
 }
