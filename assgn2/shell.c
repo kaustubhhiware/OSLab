@@ -34,7 +34,7 @@
 *  ls (support ls -l)                       - Done ls & -l
 *  cp <file1> <file2>                       - Done cp
 *  exit                                     - Done exit
-*  execute any other comoand like ./a.out   - TODo [WIP]
+*  execute any other command like ./a.out   - TODo [WIP]
 * support background execution - &          - Done &
 * redirect input output >, <                - TODo
 *  a.out | b.out - must support a| b| c     - TODo
@@ -51,7 +51,8 @@ struct _instr
 };
 typedef struct _instr instruction;
 
-char* input,input1;
+char *input,*input1;
+//char input[1000];
 int exitflag = 0;
 int filepid,fd[2];
 char cwd[BUFSIZE];
@@ -74,7 +75,7 @@ void function_lsl();
 void function_cp(char*, char*);
 void executable();
 void inert_pipe(int, instruction*);
-
+void run_process(int, int, instruction*);
 
 /*Stop processes if running in terminal(a.out), close terminal if only Ctrl+C*/
 void stopSignal()
@@ -84,7 +85,7 @@ void stopSignal()
         int temp = filepid;
         filepid = 0;
         kill(temp, SIGINT);
-   }
+    }
 }
 
 int main(int argc, char* argv[])
@@ -92,6 +93,7 @@ int main(int argc, char* argv[])
     signal(SIGINT,stopSignal);
     int i;
     int pipe1 = pipe(fd);
+    function_clear();
     screenfetch();
     function_pwd(cwd,0);
 
@@ -102,7 +104,7 @@ int main(int argc, char* argv[])
         // scanf("%s",input); - fails due to spaces, tabs
         getInput();
 
-        if(strcmp(argval[0],"exit")==0)
+        if(strcmp(argval[0],"exit")==0 || strcmp(argval[0],"z")==0)
         {
             function_exit();
         }
@@ -172,10 +174,13 @@ int main(int argc, char* argv[])
 /*get input containing spaces and tabs and store it in argval*/
 void getInput()
 {
+    fflush(stdout); // clear all previous buffers if any
     input = NULL;
     ssize_t buf = 0;
     getline(&input,&buf,stdin);
-    strcpy(input1,input); // Copy into another string if we need to run special executables
+    // Copy into another string if we need to run special executables
+    input1 = (char *)malloc(strlen(input) * sizeof(char));
+    strncpy(input1,input,strlen(input));
     argcount = 0;inBackground = 0;
     while((argval[argcount] = strsep(&input, " \t\n")) != NULL && argcount < ARGMAX-1)
     {
@@ -190,11 +195,64 @@ void getInput()
             inBackground = 1; //run in inBackground
             return;
         }
-
     }
     free(input);
 }
 
+
+// Next 3 functions are calle by executable() */
+/**/
+void openFile(char * cli, char* args[], int count)
+{
+    int i;
+    printf("open file now\n");
+    printf("cli : %s\n",cli );
+    for(i = 0; i < count; i++ )
+    {
+        printf("arg %d %s \n",i,args[i] );
+    }
+    printf("\n" );
+    execvp(cli, args);
+    char* pPath;
+    pPath = getenv("PATH");
+
+    char tempPath[1000];
+    strcpy(tempPath, pPath);
+    // strcpy(tempPath,cwd);
+    char * cmd = strtok(tempPath, ":\r\n");
+    while(cmd!=NULL)
+    {
+       char loc_sort[1000];
+        strcpy(loc_sort, cmd);
+        strcat(loc_sort, "/");
+        strcat(loc_sort, cli);
+        printf("execvp : %s\n",loc_sort );
+        execvp(loc_sort, args);
+        cmd = strtok(NULL, ":\r\n");
+    }
+    perror("+--- Error in running executable ");
+}
+
+/* run intermediate processes needed by executable() */
+void run_process(int readfrom, int writeto, instruction* command)
+{
+    int id = fork();
+    if (id==0)
+    {
+        if (readfrom!=0)
+        {
+            dup2(readfrom, 0);
+            close(readfrom);
+        }
+        if (writeto!=1)
+        {
+            dup2(writeto, 1);
+            close(writeto);
+        }
+        printf("run proc send %s to openfile\n",command->argval[0]);
+        openFile(command->argval[0], command->argval,command->argcount);
+    }
+}
 
 /**/
 void inert_pipe(int n, instruction* command)
@@ -204,7 +262,7 @@ void inert_pipe(int n, instruction* command)
 
     if(externalIn)
     {
-        in = open(infile, O_RDONLY); // open the file
+        in = open(inputfile, O_RDONLY); // open the file
         if(in < 0)
         {
             perror("+--- Error in executable : input file ");
@@ -219,55 +277,27 @@ void inert_pipe(int n, instruction* command)
         in = fd[0]; // store input for next child, it there is one
     }
 
-  /* Last stage of the pipeline - set stdin be the read end of the previous pipe
-     and output to the original file descriptor 1. */
-   if (in != 0)
-    dup2 (in, 0);
-
-   if(outFlag)
-   {
-      int ofd = open(outfile, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-      dup2(ofd, 1);
-   }
-
-   filemgr(cmd[i].arguments[0], cmd[i].arguments);
-   //execvp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
+    // keep a copy of current file descriptor
+    if(in != 0)
+    {
+        dup2(in, 0);
+    }
+    if(externalOut)
+    {
+        int ofd = open(outputfile, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        dup2(ofd, 1);
+    }
+    printf("cli sent from inert : %s\n",command[i].argval[0]);
+   openFile(command[i].argval[0], command[i].argval, command[i].argcount);
+   //execvpp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
 }
 
 
 /* executables like ./a.out */
 void executable()
 {
- /*   int id = fork();
-    int status;
-    if(inBackground)
-    {
-        argval[argcount-1] = NULL;
-        argcount--;
-    }
-    if (id < 0)
-    {
-        perror("+--- Error in running executable ");
-        return;
-    }
-    else if(id==0)
-    {
-       if(execvp(argval[0],argval)<0)
-       {
-           perror("+--- Error in running executable ");
-           return;
-       }
-    }
-    else if(inBackground==0)
-    {
-        waitpid(id,&status,0);
-    }
-    else
-    {
-        printf("+--- Process running in inBackground. PID:%d\n",id);
-    }*/
     instruction command[INPBUF];
-    int i=0,j=0;
+    int i=0,j=1,status;
     char* curr = strsep(&input1," \t\n");// need to do all over again
                                 // since we need to identify distinct commands
     command[0].argval[0] = curr;
@@ -275,48 +305,52 @@ void executable()
     while(curr!=NULL)
     {
         curr = strsep(&input1, " \t\n");
-        if(curr!=NULL && strcmp(curr,"|")==0)
+        if(curr==NULL)
+        {
+            command[i].argval[j++] = curr;
+        }
+        else if(strcmp(curr,"|")==0)
         {
             command[i].argval[j++] = NULL;
             command[i].argcount = j;
             j = 0;i++;// move to the next instruction
         }
-        else if(curr!=NULL && strcmp(curr,"<")==0)
+        else if(strcmp(curr,"<")==0)
         {
             externalIn = 1;
             curr = strsep(&input1, " \t\n");
             strcpy(inputfile, curr);
         }
-        else if(curr!=NULL && strcmp(curr,">")==0)
+        else if(strcmp(curr,">")==0)
         {
             externalOut = 1;
             curr = strsep(&input1, " \t\n");
             strcpy(outputfile, curr);
         }
-        else if(curr!=NULL && strcmp(curr, "&")==0)
+        else if(strcmp(curr, "&")==0)
         {
             inBackground = 1;
         }
         else
         {
-            command[i].arguments[j++] = curr;
+            command[i].argval[j++] = curr;
         }
     }
-    command[i].arguments[j++] = NULL; // handle last command separately
+    command[i].argval[j++] = NULL; // handle last command separately
     command[i].argcount = j;
-    i++;
+//    i++;
 
     // parent process waits for execution and then reads from terminl
     filepid = fork();
     if(filepid == 0)
     {
-         inert_pipe(i, command);
+        inert_pipe(i, command);
     }
     else
     {
         if(inBackground==0)
         {
-            waitpid(filepid, &status, 0);
+            waitpid(filepid,&status, 0);
         }
         else
         {
@@ -324,7 +358,7 @@ void executable()
         }
     }
     filepid = 0;
-
+    free(input1);
 }
 
 
@@ -365,7 +399,7 @@ void function_cp(char* file1, char* file2)
         return;
     }
     //if(access(file2,W_OK)!=0 || access(file1,R_OK)!=0 || access(file2,F_OK)!=0)
-    if(open(file2,O_WRONLY)>=0 && open(file1,O_RDONLY)>=0)
+    if(open(file2,O_WRONLY)<0 || open(file1,O_RDONLY)<0)
     {
         perror("Error in cp access ");
         return;

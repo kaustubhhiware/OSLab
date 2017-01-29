@@ -88,17 +88,23 @@ void makeDate(time_t temp, char * date)
          break;
       case 11:
          strcpy(date, "Dec");
-         break;         
+         break;
    }
 
    char day[100];
    sprintf(day, " %d %d:%d", ts->tm_mday, ts->tm_hour, ts->tm_min);
-   strcat(date, day);   
+   strcat(date, day);
 }
 
 //for opening the file
-void openFile(char * executable, char * arguments[])
+void openFile(char * executable, char * arguments[],int count)
 {
+    int i;
+    printf("Exec : %s\n",executable);
+    for(i=0;i<count;i++)
+    {
+        printf("arg %d %s\n",i,arguments[i] );
+    }
    execv(executable, arguments);
    char* pPath;
    pPath = getenv("PATH");
@@ -139,8 +145,8 @@ void spawn_proc(int in, int out, command * cmd)
           dup2 (out, 1);
           close (out);
         }
-
-      openFile(cmd->arguments[0], cmd->arguments);
+      printf("%s sent as cli from proc\n",cmd->arguments[0] );
+      openFile(cmd->arguments[0], cmd->arguments,cmd->numArgs);
       //execvp (cmd->arguments[0], (char * const *)cmd->arguments);
     }
 }
@@ -166,7 +172,7 @@ void fork_pipes (int n, command * cmd)
 
          /* f [1] is the write end of the pipe, we carry `in` from the prev iteration.  */
       spawn_proc (in, fd [1], cmd + i);
-      
+
       /* No need for the write and of the pipe, the child will write here.  */
       close (fd [1]);
 
@@ -175,7 +181,7 @@ void fork_pipes (int n, command * cmd)
     }
 
   /* Last stage of the pipeline - set stdin be the read end of the previous pipe
-     and output to the original file descriptor 1. */  
+     and output to the original file descriptor 1. */
    if (in != 0)
     dup2 (in, 0);
 
@@ -184,8 +190,8 @@ void fork_pipes (int n, command * cmd)
       int ofd = open(outfile, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
       dup2(ofd, 1);
    }
-
-   openFile(cmd[i].arguments[0], cmd[i].arguments);
+   printf("%s sent as cli from pipe\n",cmd[i].arguments[0] );
+   openFile(cmd[i].arguments[0], cmd[i].arguments,cmd[i].numArgs);
    //execvp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
 }
 
@@ -217,7 +223,7 @@ void processing(char* line,int inputChild,char* pch,int status)
       return;
 
    pch = strtok(line, " \n\r");
-   
+
    //cd command
    if(strcmp(pch, "cd")==0)
    {
@@ -240,14 +246,14 @@ void processing(char* line,int inputChild,char* pch,int status)
       status = mkdir(pch, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
       if(status == -1)
-         printf("Could not create directory\n");        
+         printf("Could not create directory\n");
    }
    //rmdir command
    else if(strcmp(pch, "rmdir")==0)
    {
       pch  = strtok(NULL, "\n\r");
       status = rmdir(pch);
-      
+
       if(status == -1)
          printf("Could not remove directory\n");
    }
@@ -267,7 +273,7 @@ void processing(char* line,int inputChild,char* pch,int status)
       while(pch!=NULL)
       {
          pch = strtok(NULL, " \r\n");
-         
+
          if(pch != NULL && strcmp(pch, "|") == 0)
          {
             arr[commIdx].arguments[argIdx++] = NULL;
@@ -313,7 +319,7 @@ void processing(char* line,int inputChild,char* pch,int status)
 
 //main function
 int main ()
-{  
+{
    signal(SIGINT, signal_Handler);
 
    char * line = (char *)malloc(1000*sizeof(char));
