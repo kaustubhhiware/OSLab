@@ -74,18 +74,20 @@ void function_ls();
 void function_lsl();
 void function_cp(char*, char*);
 void executable();
-void inert_pipe(int, instruction*);
+void pipe_dup(int, instruction*);
 void run_process(int, int, instruction*);
 
 /*Stop processes if running in terminal(a.out), close terminal if only Ctrl+C*/
 void stopSignal()
 {
+    printf("Exitting\n");
+    /*
     if(filepid!=0)
     {
         int temp = filepid;
         filepid = 0;
         kill(temp, SIGINT);
-    }
+    }*/
 }
 
 int main(int argc, char* argv[])
@@ -202,7 +204,7 @@ void getInput()
 
 // Next 3 functions are calle by executable() */
 /**/
-void openFile(char * cli, char* args[], int count)
+void runprocess(char * cli, char* args[], int count)
 {
     int i;
     printf("open file now\n");
@@ -233,29 +235,9 @@ void openFile(char * cli, char* args[], int count)
     perror("+--- Error in running executable ");
 }
 
-/* run intermediate processes needed by executable() */
-void run_process(int readfrom, int writeto, instruction* command)
-{
-    int id = fork();
-    if (id==0)
-    {
-        if (readfrom!=0)
-        {
-            dup2(readfrom, 0);
-            close(readfrom);
-        }
-        if (writeto!=1)
-        {
-            dup2(writeto, 1);
-            close(writeto);
-        }
-        printf("run proc send %s to openfile\n",command->argval[0]);
-        openFile(command->argval[0], command->argval,command->argcount);
-    }
-}
 
 /**/
-void inert_pipe(int n, instruction* command)
+void pipe_dup(int n, instruction* command)
 {
     int in = 0,fd[2], i;
     int pid, status;
@@ -268,11 +250,29 @@ void inert_pipe(int n, instruction* command)
             perror("+--- Error in executable : input file ");
         }
     }
-
+    printf("Input %s %d\n",command[0].argval[0],n );
     for (i = 0; i < n - 1; ++i)
     {
         pipe (fd);// fd[0] => fd[1] i.e, r=>w
-        run_process(in, fd[1], command + i);
+        //run_process(in, fd[1], command + i);
+        //run_process(int readfrom, int writeto, instruction* command)
+        int id = fork();
+        if (id==0)
+        {
+            if (in!=0)
+            {
+                dup2(in, 0);
+                close(in);
+            }
+            if (fd[1]!=1)
+            {
+                dup2(fd[1], 1);
+                close(fd[1]);
+            }
+            printf("run proc send %s to openfile\n",command[i].argval[0]);
+            runprocess(command[i].argval[0], command[i].argval,command[i].argcount);
+        }
+        // <=
         close(fd[1]);
         in = fd[0]; // store input for next child, it there is one
     }
@@ -288,7 +288,7 @@ void inert_pipe(int n, instruction* command)
         dup2(ofd, 1);
     }
     printf("cli sent from inert : %s\n",command[i].argval[0]);
-   openFile(command[i].argval[0], command[i].argval, command[i].argcount);
+   runprocess(command[i].argval[0], command[i].argval, command[i].argcount);
    //execvpp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
 }
 
@@ -338,13 +338,13 @@ void executable()
     }
     command[i].argval[j++] = NULL; // handle last command separately
     command[i].argcount = j;
-//    i++;
+    i++;
 
     // parent process waits for execution and then reads from terminl
     filepid = fork();
     if(filepid == 0)
     {
-        inert_pipe(i, command);
+        pipe_dup(i, command);
     }
     else
     {

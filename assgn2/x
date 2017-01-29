@@ -1,0 +1,19 @@
+cli sent from inert : ./inc
+open file now
+cli : ./inc
+arg 0 ./inc 
+arg 1  
+arg 2 (null) 
+arg 3 (null) 
+
+execvp : /usr/local/sbin/./inc
+execvp : /usr/local/bin/./inc
+execvp : /usr/sbin/./inc
+execvp : /usr/bin/./inc
+execvp : /sbin/./inc
+execvp : /bin/./inc
+execvp : /usr/games/./inc
+execvp : /usr/local/games/./inc
+[0m/home/elementary/Documents/OSLab/assgn2 ~> Exitting
+Exitting
+Exitting

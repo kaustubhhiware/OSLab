@@ -1,0 +1,6 @@
+./inc sent as cli from pipe
+Exec : ./inc
+arg 0 ./inc
+arg 1 (null)
+arg 2 (null)
+0
