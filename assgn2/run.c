@@ -34,7 +34,7 @@ int main(int argc,char* argv[])
     {
         // open gnome-terminal and hold
         // if you want parent to run, remove --disable-factory argument
-        ret = execlp("/usr/bin/gnome-terminal", "gnome-terminal", "--disable-factory", "-e", loc_sort, NULL);
+        ret = execlp("/usr/bin/gnome-terminal", "gnome-terminal", "--disable-factory", "-e", "./myshell", NULL);
         // in case of error , print
         if(ret==-1)
         {

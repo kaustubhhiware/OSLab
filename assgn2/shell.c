@@ -5,13 +5,14 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include <dirent.h> // ls
+#include <dirent.h>
 #include <sys/stat.h>
 #include <grp.h>
 #include <pwd.h>
 #include <time.h>
 #include <fcntl.h>
 #define BUFSIZE 1000
+#define INPBUF 100
 #define ARGMAX 10
 #define GREEN "\x1b[92m"
 #define BLUE "\x1b[94m"
@@ -23,7 +24,7 @@
 * 14CS30011 : Hiware Kaustubh Narendra
 * Usage - make clean ; clear ; make ; ./Cshell
 */
-/* implement basic shell functions
+/* implement shell functions
 */
 /* Instructions to support :
 *  cd <dir>                                 - Done cd
@@ -33,18 +34,31 @@
 *  ls (support ls -l)                       - Done ls & -l
 *  cp <file1> <file2>                       - Done cp
 *  exit                                     - Done exit
-*  execute any other function like ./a.out  - TODo
+*  execute any other comoand like ./a.out   - TODo [WIP]
 * support background execution - &          - Done &
 * redirect input output >, <                - TODo
 *  a.out | b.out - must support a| b| c     - TODo
 * Additional - clear
 * Additional - screenfetch
-* Additional - up down keys, tab working, history- ?
+* Additional - up down keys, history- ?
+* Additional - tab keys autocompletiton
 */
+
+struct _instr
+{
+    char * argval[INPBUF];
+    int argcount;
+};
+typedef struct _instr instruction;
+
+char* input,input1;
 int exitflag = 0;
+int filepid,fd[2];
 char cwd[BUFSIZE];
 char* argval[ARGMAX]; // our local argc, argv
-int argcount = 0,background = 0;
+int argcount = 0,inBackground = 0;
+int externalIn=0,externalOut=0;
+char inputfile[INPBUF],outputfile[INPBUF];
 void screenfetch();
 void about();
 void getInput();
@@ -59,19 +73,31 @@ void function_ls();
 void function_lsl();
 void function_cp(char*, char*);
 void executable();
+void inert_pipe(int, instruction*);
+
+
+/*Stop processes if running in terminal(a.out), close terminal if only Ctrl+C*/
+void stopSignal()
+{
+    if(filepid!=0)
+    {
+        int temp = filepid;
+        filepid = 0;
+        kill(temp, SIGINT);
+   }
+}
 
 int main(int argc, char* argv[])
 {
-    int i,logo=0;// can change default logo here
-    if(argc > 1 && strcmp(argv[1],"1")==0)
-    {
-        logo = 1;
-    }
-    screenfetch(logo);
+    signal(SIGINT,stopSignal);
+    int i;
+    int pipe1 = pipe(fd);
+    screenfetch();
     function_pwd(cwd,0);
 
     while(exitflag==0)
     {
+        externalIn = 0; externalOut = 0;inBackground = 0;
         printf("%s%s ~> ",DEF,cwd ); //print user prompt
         // scanf("%s",input); - fails due to spaces, tabs
         getInput();
@@ -80,47 +106,47 @@ int main(int argc, char* argv[])
         {
             function_exit();
         }
-        else if(strcmp(argval[0],"screenfetch")==0 && !background)
+        else if(strcmp(argval[0],"screenfetch")==0 && !inBackground)
         {
             screenfetch();
         }
-        else if(strcmp(argval[0],"about")==0 && !background)
+        else if(strcmp(argval[0],"about")==0 && !inBackground)
         {
             about();
         }
-        else if(strcmp(argval[0],"pwd")==0 && !background)
+        else if(strcmp(argval[0],"pwd")==0 && !inBackground)
         {
             function_pwd(cwd,1);
         }
-        else if(strcmp(argval[0],"cd")==0 && !background)
+        else if(strcmp(argval[0],"cd")==0 && !inBackground)
         {
             char* path = argval[1];
             function_cd(path);
         }
-        else if(strcmp(argval[0],"mkdir")==0 && !background)
+        else if(strcmp(argval[0],"mkdir")==0 && !inBackground)
         {
             char* foldername = argval[1];
             function_mkdir(foldername);
         }
-        else if(strcmp(argval[0],"rmdir")==0 && !background)
+        else if(strcmp(argval[0],"rmdir")==0 && !inBackground)
         {
             char* foldername = argval[1];
             function_rmdir(foldername);
         }
-        else if(strcmp(argval[0],"clear")==0 && !background)
+        else if(strcmp(argval[0],"clear")==0 && !inBackground)
         {
             function_clear();
         }
-        else if(strcmp(argval[0],"ls")==0 && !background)
+        else if(strcmp(argval[0],"ls")==0 && !inBackground)
         {
             char* optional = argval[1];
-            if(strcmp(optional,"-l")==0 && !background)
+            if(strcmp(optional,"-l")==0 && !inBackground)
             {
                 function_lsl();
             }
             else function_ls();
         }
-        else if(strcmp(argval[0],"cp")==0 && !background)
+        else if(strcmp(argval[0],"cp")==0 && !inBackground)
         {
             char* file1 = argval[1];
             char* file2 = argval[2];
@@ -143,12 +169,78 @@ int main(int argc, char* argv[])
 }
 
 
+/*get input containing spaces and tabs and store it in argval*/
+void getInput()
+{
+    input = NULL;
+    ssize_t buf = 0;
+    getline(&input,&buf,stdin);
+    strcpy(input1,input); // Copy into another string if we need to run special executables
+    argcount = 0;inBackground = 0;
+    while((argval[argcount] = strsep(&input, " \t\n")) != NULL && argcount < ARGMAX-1)
+    {
+        // do not consider "" as a parameter
+        if(sizeof(argval[argcount])==0)
+        {
+            free(argval[argcount]);
+        }
+        else argcount++;
+        if(strcmp(argval[argcount-1],"&")==0)
+        {
+            inBackground = 1; //run in inBackground
+            return;
+        }
+
+    }
+    free(input);
+}
+
+
+/**/
+void inert_pipe(int n, instruction* command)
+{
+    int in = 0,fd[2], i;
+    int pid, status;
+
+    if(externalIn)
+    {
+        in = open(infile, O_RDONLY); // open the file
+        if(in < 0)
+        {
+            perror("+--- Error in executable : input file ");
+        }
+    }
+
+    for (i = 0; i < n - 1; ++i)
+    {
+        pipe (fd);// fd[0] => fd[1] i.e, r=>w
+        run_process(in, fd[1], command + i);
+        close(fd[1]);
+        in = fd[0]; // store input for next child, it there is one
+    }
+
+  /* Last stage of the pipeline - set stdin be the read end of the previous pipe
+     and output to the original file descriptor 1. */
+   if (in != 0)
+    dup2 (in, 0);
+
+   if(outFlag)
+   {
+      int ofd = open(outfile, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+      dup2(ofd, 1);
+   }
+
+   filemgr(cmd[i].arguments[0], cmd[i].arguments);
+   //execvp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
+}
+
+
 /* executables like ./a.out */
 void executable()
 {
-    int id = fork();
+ /*   int id = fork();
     int status;
-    if(background)
+    if(inBackground)
     {
         argval[argcount-1] = NULL;
         argcount--;
@@ -166,14 +258,73 @@ void executable()
            return;
        }
     }
-    else if(background==0)
+    else if(inBackground==0)
     {
         waitpid(id,&status,0);
     }
     else
     {
-        printf("+--- Process running in background. PID:%d\n",id);
+        printf("+--- Process running in inBackground. PID:%d\n",id);
+    }*/
+    instruction command[INPBUF];
+    int i=0,j=0;
+    char* curr = strsep(&input1," \t\n");// need to do all over again
+                                // since we need to identify distinct commands
+    command[0].argval[0] = curr;
+
+    while(curr!=NULL)
+    {
+        curr = strsep(&input1, " \t\n");
+        if(curr!=NULL && strcmp(curr,"|")==0)
+        {
+            command[i].argval[j++] = NULL;
+            command[i].argcount = j;
+            j = 0;i++;// move to the next instruction
+        }
+        else if(curr!=NULL && strcmp(curr,"<")==0)
+        {
+            externalIn = 1;
+            curr = strsep(&input1, " \t\n");
+            strcpy(inputfile, curr);
+        }
+        else if(curr!=NULL && strcmp(curr,">")==0)
+        {
+            externalOut = 1;
+            curr = strsep(&input1, " \t\n");
+            strcpy(outputfile, curr);
+        }
+        else if(curr!=NULL && strcmp(curr, "&")==0)
+        {
+            inBackground = 1;
+        }
+        else
+        {
+            command[i].arguments[j++] = curr;
+        }
     }
+    command[i].arguments[j++] = NULL; // handle last command separately
+    command[i].argcount = j;
+    i++;
+
+    // parent process waits for execution and then reads from terminl
+    filepid = fork();
+    if(filepid == 0)
+    {
+         inert_pipe(i, command);
+    }
+    else
+    {
+        if(inBackground==0)
+        {
+            waitpid(filepid, &status, 0);
+        }
+        else
+        {
+            printf("+--- Process running in inBackground. PID:%d\n",filepid);
+        }
+    }
+    filepid = 0;
+
 }
 
 
@@ -368,33 +519,6 @@ void function_cd(char* path)
         function_pwd(cwd,0);
     }
     else perror("+--- Error in cd ");
-}
-
-
-/*get input containing spaces and tabs and store it in argval*/
-void getInput()
-{
-    char* input = NULL;
-    ssize_t buf = 0;
-    getline(&input,&buf,stdin);
-
-    argcount = 0;background = 0;
-    while((argval[argcount] = strsep(&input, " \t\n")) != NULL && argcount < ARGMAX-1)
-    {
-        // do not consider "" as a parameter
-        if(sizeof(argval[argcount])==0)
-        {
-            free(argval[argcount]);
-        }
-        else argcount++;
-        if(strcmp(argval[argcount-1],"&")==0)
-        {
-            background = 1; //run in background
-            return;
-        }
-
-    }
-    free(input);
 }
 
 
