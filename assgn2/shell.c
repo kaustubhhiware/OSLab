@@ -202,7 +202,7 @@ void getInput()
 }
 
 
-// Next 2 functions are calle by executable() */
+// Next 2 functions are called by executable() */
 /* use execvp to run the command, check path, and handle erors*/
 void runprocess(char * cli, char* args[], int count)
 {
@@ -217,7 +217,7 @@ void runprocess(char * cli, char* args[], int count)
     */
     int ret = execvp(cli, args);
     char* pathm;
-    pathm = getenv("PATH");
+    pathm = getenv("PATH");// check for all paths , executing non./
     char path[1000];
     strcpy(path, pathm);
     strcat(path,":");
@@ -282,7 +282,7 @@ void pipe_dup(int n, instruction* command)
                 close(fd[1]);
             }
 
-            //printf("run proc send %s to openfile\n",command[i].argval[0]);
+            //printf("pipe_dup send %s to runprocess\n",command[i].argval[0]);
             runprocess(command[i-1].argval[0], command[i-1].argval,command[i-1].argcount);
             exit(0);
 
@@ -302,9 +302,8 @@ void pipe_dup(int n, instruction* command)
         int ofd = open(outputfile, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         dup2(ofd, 1);
     }
-    //  printf("cli sent from inert : %s\n",command[i].argval[0]);
+    //  printf("cli sent from pipe_dup : %s\n",command[i].argval[0]);
     runprocess(command[i].argval[0], command[i].argval, command[i].argcount);
-    //execvp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
 }
 
 
