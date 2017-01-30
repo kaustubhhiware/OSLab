@@ -80,14 +80,14 @@ void run_process(int, int, instruction*);
 /*Stop processes if running in terminal(a.out), close terminal if only Ctrl+C*/
 void stopSignal()
 {
-    printf("Exitting\n");
-    /*
+
     if(filepid!=0)
     {
         int temp = filepid;
+        kill(filepid, SIGINT);
         filepid = 0;
-        kill(temp, SIGINT);
-    }*/
+
+    }
 }
 
 int main(int argc, char* argv[])
@@ -202,11 +202,11 @@ void getInput()
 }
 
 
-// Next 3 functions are calle by executable() */
-/**/
+// Next 2 functions are calle by executable() */
+/* use execvp to run the command, check path, and handle erors*/
 void runprocess(char * cli, char* args[], int count)
 {
-    int i;
+    /*int i;
     printf("open file now\n");
     printf("cli : %s\n",cli );
     for(i = 0; i < count; i++ )
@@ -214,14 +214,15 @@ void runprocess(char * cli, char* args[], int count)
         printf("arg %d %s \n",i,args[i] );
     }
     printf("\n" );
-    execvp(cli, args);
-    char* pPath;
-    pPath = getenv("PATH");
-
-    char tempPath[1000];
-    strcpy(tempPath, pPath);
-    // strcpy(tempPath,cwd);
-    char * cmd = strtok(tempPath, ":\r\n");
+    */
+    int ret = execvp(cli, args);
+    char* pathm;
+    pathm = getenv("PATH");
+    char path[1000];
+    strcpy(path, pathm);
+    strcat(path,":");
+    strcat(path,cwd);
+    char * cmd = strtok(path, ":\r\n");
     while(cmd!=NULL)
     {
        char loc_sort[1000];
@@ -229,18 +230,22 @@ void runprocess(char * cli, char* args[], int count)
         strcat(loc_sort, "/");
         strcat(loc_sort, cli);
         printf("execvp : %s\n",loc_sort );
-        execvp(loc_sort, args);
+        ret = execvp(loc_sort, args);
+        if(ret==-1)
+        {
+            perror("+--- Error in running executable ");
+            exit(0);
+        }
         cmd = strtok(NULL, ":\r\n");
     }
-    perror("+--- Error in running executable ");
 }
 
 
-/**/
+/* create pipes if required and send proper formatted commands to run_process */
 void pipe_dup(int n, instruction* command)
 {
     int in = 0,fd[2], i;
-    int pid, status;
+    int pid, status,pipest;
 
     if(externalIn)
     {
@@ -250,15 +255,22 @@ void pipe_dup(int n, instruction* command)
             perror("+--- Error in executable : input file ");
         }
     }
-    printf("Input %s %d\n",command[0].argval[0],n );
-    for (i = 0; i < n - 1; ++i)
+    printf("%d %d\n",command[0].argcount,n );
+    // enters only in case of pipes
+    for (i = 1; i < n; i++)
     {
+        /*printf("Input ");
+        int k;
+        for(k=0;k<command[0].argcount;k++)
+        {
+            printf("%s ",command[0].argval[k]);
+        }*/
+        //printf("i is in loop : %d %s\n",i-1,command[i-1].argval[0]);
         pipe (fd);// fd[0] => fd[1] i.e, r=>w
-        //run_process(in, fd[1], command + i);
-        //run_process(int readfrom, int writeto, instruction* command)
         int id = fork();
         if (id==0)
         {
+
             if (in!=0)
             {
                 dup2(in, 0);
@@ -269,14 +281,17 @@ void pipe_dup(int n, instruction* command)
                 dup2(fd[1], 1);
                 close(fd[1]);
             }
-            printf("run proc send %s to openfile\n",command[i].argval[0]);
-            runprocess(command[i].argval[0], command[i].argval,command[i].argcount);
+
+            //printf("run proc send %s to openfile\n",command[i].argval[0]);
+            runprocess(command[i-1].argval[0], command[i-1].argval,command[i-1].argcount);
+            exit(0);
+
         }
-        // <=
+        else wait(&pipest);
         close(fd[1]);
         in = fd[0]; // store input for next child, it there is one
     }
-
+    i--; // for final case
     // keep a copy of current file descriptor
     if(in != 0)
     {
@@ -288,8 +303,8 @@ void pipe_dup(int n, instruction* command)
         dup2(ofd, 1);
     }
     printf("cli sent from inert : %s\n",command[i].argval[0]);
-   runprocess(command[i].argval[0], command[i].argval, command[i].argcount);
-   //execvpp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
+    runprocess(command[i].argval[0], command[i].argval, command[i].argcount);
+    //execvp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
 }
 
 
