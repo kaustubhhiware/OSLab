@@ -5,7 +5,7 @@
 int main()
 {
     srand(time(NULL));
-    int n = rand() % 10;
+    int n = rand() % 10 + 5;
     printf("%d\n",n );
     int i,x=0;
     for(i = 0 ; i < n; i++ )

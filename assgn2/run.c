@@ -10,8 +10,8 @@
 */
 /* execute our shell process from shell.c
 */
-/* get sort1 executable first - gcc shell.c -o myshell
-*  create xsort executable then - gcc run.c -o Cshell
+/* get shell executable first - gcc shell.c -o myshell
+*  create run executable then - gcc run.c -o Cshell
 *  Usage - ./Cshell
 */
 int main(int argc,char* argv[])

@@ -255,7 +255,7 @@ void pipe_dup(int n, instruction* command)
             perror("+--- Error in executable : input file ");
         }
     }
-    printf("%d %d\n",command[0].argcount,n );
+    //printf("%d %d\n",command[0].argcount,n );
     // enters only in case of pipes
     for (i = 1; i < n; i++)
     {
@@ -302,7 +302,7 @@ void pipe_dup(int n, instruction* command)
         int ofd = open(outputfile, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         dup2(ofd, 1);
     }
-    printf("cli sent from inert : %s\n",command[i].argval[0]);
+    //  printf("cli sent from inert : %s\n",command[i].argval[0]);
     runprocess(command[i].argval[0], command[i].argval, command[i].argcount);
     //execvp(cmd [i].arguments [0], (char * const *)cmd [i].arguments);
 }
