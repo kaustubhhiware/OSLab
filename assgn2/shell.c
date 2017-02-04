@@ -34,14 +34,14 @@
 *  ls (support ls -l)                       - Done ls & -l
 *  cp <file1> <file2>                       - Done cp
 *  exit                                     - Done exit
-*  execute any other command like ./a.out   - TODo [WIP]
+*  execute any other command like ./a.out   - Done ./a.out
 * support background execution - &          - Done &
-* redirect input output >, <                - TODo
-*  a.out | b.out - must support a| b| c     - TODo
-* Additional - clear
-* Additional - screenfetch
-* Additional - up down keys, history- ?
-* Additional - tab keys autocompletiton
+* redirect input output >, <                - Done
+*  a.out | b.out - must support a| b| c     - Done
+* Additional - clear                        - Done
+* Additional - screenfetch                  - Done
+* Additional - up down keys, history- ?     - Done
+* Additional - tab keys autocompletiton     - Done
 */
 
 struct _instr
