@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <sys/sem.h>
 #include <sys/wait.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -33,6 +32,14 @@ key_t keym = 11;
 #define P(s) semop(s, &pop, 1)
 #define V(s) semop(s, &vop, 1)
 
+typedef struct records_
+{
+    char first[21];
+    char last[21];
+    int roll;
+    float cgpa;
+} records;
+
 void printerror(const char* printmsg, int argcount, int* argval)
 {
     int i;
@@ -48,6 +55,7 @@ void printerror(const char* printmsg, int argcount, int* argval)
 }
 
 void letxstart();
+void printLine();
 int shmx, shmstud, shmdelta, shmnum, shmusers, wrt, mutex;
 
 
@@ -56,20 +64,26 @@ int main(int argc, char* argv[])
     letxstart();
     printf("X started! Can support operations now\n");
 
-    int opt = 0;
-    char *in;
-
-    shmstud = shmget(keys, numstudents*sizeof(int), 0);
-    shmdelta = shmget(keyd, sizeof(int), 0);
+    int *num;
     shmnum = shmget(keyn, sizeof(int), 0);
-    shmusers = shmget(keyu, sizeof(int), 0);
-    printerror("Error in shmget", 4, (int[]){ shmstud, shmdelta, shmnum, shmusers });
+    printerror("Error in shmget num", 1, (int[]){ shmnum });
+    num = (int *) shmat(shmnum, 0, 0);
+    printerror("Error in shmat num", 1, (int[]){ *num });
 
-    int *delta, *users, *num;
+    shmstud = shmget(keys, num[0]*sizeof(int), 0);
+    shmdelta = shmget(keyd, sizeof(int), 0);
+    shmusers = shmget(keyu, sizeof(int), 0);
+    printerror("Error in shmget", 3, (int[]){ shmstud, shmdelta, shmnum });
+
+    int *delta, *users;
     delta = (int *) shmat(shmdelta, 0, 0);
     users = (int *) shmat(shmusers, 0, 0);
-    num = (int *) shmat(shmnum, 0, 0);
-    printerror("Error in shmat", 3, (int[]){ *delta, *users, *num });
+    printerror("Error in shmat", 2, (int[]){ *delta, *users });
+    records* students = (records *) shmat(shmstud, 0, 0);
+
+    wrt = semget(keyw, 1, 0777|IPC_CREAT);
+    mutex = semget(keym, 1, 0777|IPC_CREAT);
+    printerror("Error in semget", 2, (int[]){ wrt, mutex });
 
     struct sembuf pop, vop;
     // initialize sembufs
@@ -78,36 +92,98 @@ int main(int argc, char* argv[])
     pop.sem_op = -1 ;   // value removed from semaphore
     vop.sem_op = 1 ;    // value added to semaphore
 
+    int opt = 0, r, found = 0, i;
+    float cg;
     while(1)
     {
         letxstart();
         printf("\n");
         printf("+--------------------------------------------------+\n");
-        printf("+ Following operations are supported. What to do ? +\n");
-        printf("+ 0 |   Query memory by roll numbers               +\n");
-        printf("+ 1 |   Update CGPA of a student                   +\n");
-        printf("+ 2 |   Exit                                       +\n");
+        printf("| Following operations are supported. What to do ? |\n");
+        printf("| 0 |   Query memory by roll numbers               |\n");
+        printf("| 1 |   Update CGPA of a student                   |\n");
+        printf("| 2 |   Exit                                       |\n");
         printf("+--------------------------------------------------+\n");
-
-        scanf("%s", in);
-        sscanf(in, "%d", &opt);
-
-        // migrate to separate functions later
+        printf("+--- Enter choice : ");
+        char *in;
+        //scanf("%s", in);
+        //sscanf(in, "%d", &opt);
+        scanf("%d",&opt);
         if(opt==0)
         {
             printf("+--- You chose to query. Enter roll number : ");
-            int r;
-            scanf("%s", in);
-            sscanf(in, "%d", &r);
+            //scanf("%s", in);
+            //sscanf(in, "%d", &r);
+            scanf("%d",&r);
 
             P(mutex);
+            users[0] += 1;
+            if(users[0]==1)
+            {
+                P(wrt);
+            }
+            V(mutex);
 
+            found = 0;
+            for(i = 0; i < num[0]; i++)
+            {
+                if(students[i].roll==r)
+                {
+                    printf("+--- Student found!\n");
+                    printLine();
+                    printf("|  first name         |  last name          | Roll| CGPA |\n");
+                    printLine();
+                    printf("| %-20s| %-20s| %-4d| %-2.2f |\n",students[i].first, students[i].last, students[i].roll, students[i].cgpa );
+                    printLine();
+
+                    found = 1;
+                    break;
+                }
+            }
+            if(!found)
+            {
+                printf("+--- Student not found \n");
+            }
+
+            P(mutex);
+            users[0] -= 1;
+            if(users[0]==0)
+            {
+                V(wrt);
+            }
+            V(mutex);
 
         }
         else if(opt==1)
         {
             printf("+--- You chose to update CG. Enter roll number : ");
+            //scanf("%s", in);
+            //sscanf(in, "%d", &r);
+            scanf("%d",&r);
+            printf("+--- Enter updated CGPA : ");
+            scanf("%f", &cg);
 
+            P(wrt);
+
+            found = 0;
+            for(i = 0; i < num[0]; i++)
+            {
+                if(students[i].roll==r)
+                {
+                    students[i].cgpa = cg;
+
+                    printf("+--- CGPA updated for roll# %-4d\n",r );
+                    delta[0] = 1;
+                    found = 1;
+                    break;
+                }
+            }
+            if(!found)
+            {
+                printf("+--- Student not found \n");
+            }
+
+            V(wrt);
 
         }
         else
@@ -122,11 +198,17 @@ int main(int argc, char* argv[])
 
 void letxstart()
 {
-    int didxstart = shmget(keyx, sizeof(int), 0);
+    int didxstart = shmget(keys, sizeof(int), 0);
     while(didxstart==-1)
     {
         printf("Wait for X to start\n");
         sleep(5);
-        didxstart = shmget(keyx, sizeof(int), 0);
+        didxstart = shmget(keys, sizeof(int), 0);
     }
+}
+
+
+void printLine()
+{
+    printf("+---------------------+---------------------+-----+------+\n");
 }

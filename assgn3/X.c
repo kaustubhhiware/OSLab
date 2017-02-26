@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <sys/sem.h>
 #include <sys/wait.h>
-#include <stdbool.h>
 #include <string.h>
 #include <assert.h>
 #include <signal.h>
@@ -31,8 +30,8 @@
 
 typedef struct records_
 {
-    char first[20];
-    char last[20];
+    char first[21];
+    char last[21];
     int roll;
     float cgpa;
 } records;
@@ -44,8 +43,8 @@ key_t keyn = 3;
 key_t keyu = 4;
 key_t keyw = 10;
 key_t keym = 11;
-int numlines();
-void saveandexit();
+int numlines(char*);
+void closeandexit();
 // standardised function to check for errors, no repetition
 void printerror(const char* printmsg, int argcount, int* argval)
 {
@@ -66,7 +65,7 @@ int shmx, shmstud, shmdelta, shmnum, shmusers, wrt, mutex;
 
 int main(int argc, char* argv[])
 {
-    signal(SIGINT, saveandexit);
+    signal(SIGINT, closeandexit);
     char filename[100];
     if(argc > 1)
     {
@@ -78,7 +77,7 @@ int main(int argc, char* argv[])
         exit(0);
     }
 
-    int numstudents = numlines(), i = 0;
+    int numstudents = numlines(argv[1]), i = 0;
 
     shmx = shmget(keyx, sizeof(int), 0777|IPC_CREAT);
     shmstud = shmget(keys, numstudents*sizeof(int), 0777|IPC_CREAT);
@@ -99,7 +98,7 @@ int main(int argc, char* argv[])
     FILE *fp = fopen(argv[1], "r");
     if(fp==NULL)
     {
-        printf("+--- records.txt not found!\n");
+        printf("+--- File not found!\n");
         exit(0);
     }
     records* students = (records *) shmat(shmstud, 0, 0);
@@ -128,11 +127,15 @@ int main(int argc, char* argv[])
     pop.sem_op = -1 ;   // value removed from semaphore
     vop.sem_op = 1 ;    // value added to semaphore
 
+    int t = 0;
     while(1)
     {
         sleep(5);
+        printf("+--- Changes from %4d to %4d :\t",t,t+5);
+        t += 5;
         if(delta[0]==0)
         {
+            printf("All good\n");
             continue; // no changes
         }
 
@@ -146,11 +149,11 @@ int main(int argc, char* argv[])
 
         int s;
         fp = fopen(argv[1],"r+");
-        for(i = 0; i < numstudents - 1; i++)
+        for(i = 0; i < numstudents; i++)
         {
             s += fprintf(fp, "%s %s %d %f\n", students[i].first, students[i].last, students[i].roll, students[i].cgpa );
         }
-        printf("+--- Records have been updated\n");
+        printf("Records have been updated\n");
         fclose(fp);
         delta[0] = 0;
 
@@ -168,7 +171,7 @@ int main(int argc, char* argv[])
 }
 
 
-void saveandexit()
+void closeandexit()
 {
     int e1 = shmctl(shmx, IPC_RMID, 0);
     int e2 = shmctl(shmstud, IPC_RMID, 0);
@@ -183,13 +186,13 @@ void saveandexit()
 }
 
 
-int numlines()
+int numlines(char* str)
 {
     int lines = 0, ch = 0;
-    FILE *fp = fopen("records.txt","r");
+    FILE *fp = fopen(str,"r");
     if(fp==NULL)
     {
-        printf("+--- records.txt not found!\n");
+        printf("+--- File not found!\n");
         exit(0);
     }
 
