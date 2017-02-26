@@ -56,7 +56,7 @@ void printerror(const char* printmsg, int argcount, int* argval)
 
 void letxstart();
 void printLine();
-int shmx, shmstud, shmdelta, shmnum, shmusers, wrt, mutex;
+int shmx, shmstud, shmdelta, shmnum, shmusers, wrt;
 
 
 int main(int argc, char* argv[])
@@ -82,8 +82,7 @@ int main(int argc, char* argv[])
     records* students = (records *) shmat(shmstud, 0, 0);
 
     wrt = semget(keyw, 1, 0777|IPC_CREAT);
-    mutex = semget(keym, 1, 0777|IPC_CREAT);
-    printerror("Error in semget", 2, (int[]){ wrt, mutex });
+    printerror("Error in semget", 1, (int[]){ wrt });
 
     struct sembuf pop, vop;
     // initialize sembufs
@@ -116,13 +115,11 @@ int main(int argc, char* argv[])
             //sscanf(in, "%d", &r);
             scanf("%d",&r);
 
-            P(mutex);
             users[0] += 1;
             if(users[0]==1)
             {
                 P(wrt);
             }
-            V(mutex);
 
             found = 0;
             for(i = 0; i < num[0]; i++)
@@ -145,13 +142,11 @@ int main(int argc, char* argv[])
                 printf("+--- Student not found \n");
             }
 
-            P(mutex);
             users[0] -= 1;
             if(users[0]==0)
             {
                 V(wrt);
             }
-            V(mutex);
 
         }
         else if(opt==1)

@@ -24,6 +24,7 @@
 * Check periodically for mods
 * No new additions allowed whatsoever
 * ONLY X CREATE ALL SHMs/ SEMs
+* X and Y need not wait for each other, only let other know if operating
 */
 #define P(s) semop(s, &pop, 1)
 #define V(s) semop(s, &vop, 1)
@@ -60,7 +61,7 @@ void printerror(const char* printmsg, int argcount, int* argval)
     }
 }
 // need to declare globally to handle Ctrl+C
-int shmx, shmstud, shmdelta, shmnum, shmusers, wrt, mutex;
+int shmx, shmstud, shmdelta, shmnum, shmusers, wrt;
 
 
 int main(int argc, char* argv[])
@@ -87,12 +88,10 @@ int main(int argc, char* argv[])
     printerror("Error in shmget", 5, (int[]){ shmx, shmstud, shmdelta, shmnum, shmusers });
 
     wrt = semget(keyw, 1, 0777|IPC_CREAT);
-    mutex = semget(keym, 1, 0777|IPC_CREAT);
-    printerror("Error in semget", 2, (int[]){ wrt, mutex });
+    printerror("Error in semget", 1, (int[]){ wrt });
 
     int e1 = semctl(wrt, 0, SETVAL, 1);
-    int e2 = semctl(mutex, 0, SETVAL, 1);
-    printerror("Error in semctl", 2, (int[]){ e1, e2 });
+    printerror("Error in semctl", 1, (int[]){ e1 });
 
     // Read file from data
     FILE *fp = fopen(argv[1], "r");
@@ -139,13 +138,11 @@ int main(int argc, char* argv[])
             continue; // no changes
         }
 
-        P(mutex);
         users[0] += 1;
         if(users[0]==1)
         {
             P(wrt);
         }
-        V(mutex);
 
         int s;
         fp = fopen(argv[1],"r+");
@@ -157,14 +154,11 @@ int main(int argc, char* argv[])
         fclose(fp);
         delta[0] = 0;
 
-        P(mutex);
         users[0] -= 1;
         if(users[0]==0)
         {
             V(wrt);
         }
-        V(mutex);
-
 
     }
 
@@ -179,9 +173,8 @@ void closeandexit()
     int e4 = shmctl(shmnum, IPC_RMID, 0);
     int e5 = shmctl(shmusers, IPC_RMID, 0);
     int e6 = semctl(wrt, 0, IPC_RMID, 0);
-    int e7 = semctl(mutex, 0, IPC_RMID, 0);
     printerror("Error in shmctl(remove)", 5, (int[]){ e1, e2, e3, e4, e5 });
-    printerror("Error in semctl(remove)", 2, (int[]){ e6, e7 });
+    printerror("Error in semctl(remove)", 1, (int[]){ e6 });
     exit(0);
 }
 
