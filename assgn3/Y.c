@@ -28,7 +28,6 @@ key_t keyd = 2;
 key_t keyn = 3;
 key_t keyu = 4;
 key_t keyw = 10;
-key_t keym = 11;
 #define P(s) semop(s, &pop, 1)
 #define V(s) semop(s, &vop, 1)
 
@@ -184,6 +183,11 @@ int main(int argc, char* argv[])
         else
         {
             printf("Exitting...\n");
+            int e1 = shmdt(num);
+            int e2 = shmdt(delta);
+            int e3 = shmdt(users);
+            int e4 = shmdt(students);
+            printerror("Error in shmdt", 4, (int[]){ e1, e2, e3, e4 });
             exit(0);
         }
     }

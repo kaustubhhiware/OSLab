@@ -43,7 +43,6 @@ key_t keyd = 2;
 key_t keyn = 3;
 key_t keyu = 4;
 key_t keyw = 10;
-key_t keym = 11;
 int numlines(char*);
 void closeandexit();
 // standardised function to check for errors, no repetition
@@ -167,6 +166,7 @@ int main(int argc, char* argv[])
 
 void closeandexit()
 {
+    printf("Exitting ...\n");
     int e1 = shmctl(shmx, IPC_RMID, 0);
     int e2 = shmctl(shmstud, IPC_RMID, 0);
     int e3 = shmctl(shmdelta, IPC_RMID, 0);
