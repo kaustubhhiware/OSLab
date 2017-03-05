@@ -11,12 +11,12 @@
 // run with -
 //  gcc -pthread shuffle.c
 //
-int rounds = 0, threads = 0;
+int rowrounds = 0, colrounds = 0, rounds = 0, threads = 0;
 int n, k, x, rowshift=1;// roswhift maintains if rowshift or colshift
 int a[MAX][MAX], last[MAX], last2[MAX];
 pthread_t thread_id[MAX];
 pthread_mutex_t mutex1;
-pthread_cond_t condition;
+pthread_cond_t cond1, cond2;
 
 typedef struct thread_data_ {
     int index; // which thread is this
@@ -55,11 +55,11 @@ void *start_routine(void *param)
     thread_data *t_param = (thread_data *) param;
     int tid = (*t_param).index;
 
-    // while(rounds < 2*k)
-    // {
+    while(rowrounds < k || colrounds < k)
+    {
         // inside critical section
         pthread_mutex_lock(&mutex1);
-        if(rounds%2==0) // rowshift
+        if(rowrounds==colrounds) // rowshift
         {
             for ( i = 0; i < n; i++)
             {
@@ -71,6 +71,7 @@ void *start_routine(void *param)
             }
             if(tid==x-1)
             {
+                printf("I'm here\n");
                 for(i = 0; i < n; i++)
                 {
                     a[i][n-2] = last[i];
@@ -79,6 +80,7 @@ void *start_routine(void *param)
         }
         else // this is columnshift
         {
+            printf("Fixing rows %d - %d\n", n - (n/x)*(tid+1)-1, n - (n/x)*tid);
             for ( j = 0; j < n; j++)
             {
                 if(tid==0) last2[j] = a[n-1][j];
@@ -87,18 +89,54 @@ void *start_routine(void *param)
                     a[i][j] = a[(n+i-1)%n][j];
                 }
             }
-            if(tid==x-1)
+            printArr();
+            if(tid==0)
             {
+                printf("\tI'm here too\n");
+                printArr();
+
                 for(j = 0; j < n; j++)
                 {
                     a[0][j] = last2[j];
                 }
+                printf("\t2 done this\n");
+                printArr();
             }
         }
 
         threads++;
+        printf("Currently %d rowrounds, %d colrounds & %d threads \n", rowrounds, colrounds, threads );
+        if(threads==x)
+        {
+            if(rowrounds==colrounds)
+            {
+                pthread_cond_broadcast(&cond1);
+                rowrounds++;
+            }
+            else
+            {
+                pthread_cond_broadcast(&cond2);
+                colrounds++;
+            }
+            threads = 0;
+            printf("Completed %d rowrounds and %d colrounds\n", rowrounds, colrounds );
+            printArr();
+        }
+        if(threads!=0)
+        {
+            if(rowrounds==colrounds)
+            {
+                printf("Will wait for rowrounds to complete\n");
+                pthread_cond_wait(&cond1, &mutex1);
+            }
+            else
+            {
+                printf("Will wait for colrounds to complete\n");
+                pthread_cond_wait(&cond2, &mutex1);
+            }
+        }
         pthread_mutex_unlock(&mutex1);
-    // }
+    }
 
     printf("\nThread  %ld finished updating\n", thread_id[tid]);
     pthread_exit(NULL);
@@ -130,7 +168,8 @@ int main(int argc, char* argv[])
 
     // initialize mutex and condition
     pthread_mutex_init(&mutex1, NULL);
-    pthread_cond_init(&condition, NULL);
+    pthread_cond_init(&cond1, NULL);
+    pthread_cond_init(&cond2, NULL);
     thread_data param[x];
 
     // creating the threads - one rotation
@@ -151,7 +190,8 @@ int main(int argc, char* argv[])
     printArr();
     pthread_mutex_unlock(&mutex1);
 
-    // Clean up the mutex
+    // Clean up the thread vars
     pthread_mutex_destroy(&mutex1);
-    pthread_cond_destroy(&condition);
+    pthread_cond_destroy(&cond1);
+    pthread_cond_destroy(&cond2);
 }
