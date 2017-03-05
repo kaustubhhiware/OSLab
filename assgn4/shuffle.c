@@ -3,29 +3,31 @@
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
-# define MAX 100
+#define MAX 100
 /*
 * Assignment 4 part 1
 * 14CS30011 : Hiware Kaustubh Narendra
 */
 // run with -
 //  gcc -pthread shuffle.c
+// ./a.out 1 prints intermediate matrices as well
 //
-int rowrounds = 0, colrounds = 0, rounds = 0, threads = 0;
-int n, k, x, rowshift=1;// roswhift maintains if rowshift or colshift
+int rowrounds = 0, colrounds = 0, threads = 0;
+int n, k, x, details = 0;
 int a[MAX][MAX], last[MAX], last2[MAX];
 pthread_t thread_id[MAX];
 pthread_mutex_t mutex1;
-pthread_cond_t cond1, cond2;
+pthread_cond_t row_cond, col_cond;
 
 typedef struct thread_data_ {
     int index; // which thread is this
 }thread_data;
 
 // just a function to fancy print your n x n array
-void printArr()
+void printArr(const char* delim)
 {
     int i,j,k;
+    printf("%s",delim);
     for (k = 0; k < n; k++)
     {
         printf("+----");
@@ -33,12 +35,14 @@ void printArr()
     printf("+\n");
     for (i = 0; i < n; i++)
     {
+        printf("%s",delim);
         for (j = 0; j < n; j++)
         {
             printf("|%4d",a[i][j] );
         }
         printf("|\n");
     }
+    printf("%s",delim);
     for (k = 0; k < n; k++)
     {
         printf("+----");
@@ -50,7 +54,6 @@ void printArr()
 // Function executed by all threads created
 void *start_routine(void *param)
 {
-    // Take out the parameter
     int i, j;
     thread_data *t_param = (thread_data *) param;
     int tid = (*t_param).index;
@@ -61,78 +64,70 @@ void *start_routine(void *param)
         pthread_mutex_lock(&mutex1);
         if(rowrounds==colrounds) // rowshift
         {
-            for ( i = 0; i < n; i++)
+            for ( i = (n*tid)/x ; i < (n*(tid + 1))/x && i < n; i++)
             {
-                if(tid==0) last[i] = a[i][n-1];
-                for(j = (n/x)*tid ; j < (n/x)*(tid + 1) && j < n; j++)
+                last[i] = a[i][0];
+                for(j = 0; j < n-1; j++)
                 {
-                    a[i][(n+j-1)%n] = a[i][j];
+                    a[i][j] = a[i][j+1];
                 }
             }
-            if(tid==x-1)
+            if(tid==x-1) // in the last thread, copy the last column
             {
-                printf("I'm here\n");
                 for(i = 0; i < n; i++)
                 {
-                    a[i][n-2] = last[i];
+                    a[i][n-1] = last[i];
                 }
             }
         }
         else // this is columnshift
         {
-            printf("Fixing rows %d - %d\n", n - (n/x)*(tid+1)-1, n - (n/x)*tid);
-            for ( j = 0; j < n; j++)
+            for ( j = (n*tid)/x; j < (n*(tid + 1))/x && j < n; j++)
             {
-                if(tid==0) last2[j] = a[n-1][j];
-                for(i = n - (n/x)*tid ; i > n - (n/x)*(tid + 1) && i > 0; i--)
+                last2[j] = a[n-1][j];
+                for(i = n-1; i > 0; i--)
                 {
                     a[i][j] = a[(n+i-1)%n][j];
                 }
             }
-            printArr();
             if(tid==0)
             {
-                printf("\tI'm here too\n");
-                printArr();
-
                 for(j = 0; j < n; j++)
                 {
                     a[0][j] = last2[j];
                 }
-                printf("\t2 done this\n");
-                printArr();
             }
         }
 
         threads++;
-        printf("Currently %d rowrounds, %d colrounds & %d threads \n", rowrounds, colrounds, threads );
+        // printf("Currently %d rowrounds, %d colrounds & %d threads \n", rowrounds, colrounds, threads );
         if(threads==x)
         {
             if(rowrounds==colrounds)
             {
-                pthread_cond_broadcast(&cond1);
+                pthread_cond_broadcast(&row_cond);
                 rowrounds++;
             }
             else
             {
-                pthread_cond_broadcast(&cond2);
+                pthread_cond_broadcast(&col_cond);
                 colrounds++;
             }
             threads = 0;
             printf("Completed %d rowrounds and %d colrounds\n", rowrounds, colrounds );
-            printArr();
+            if(details) printArr("\t");
         }
-        if(threads!=0)
+        if(threads!=0) // yet to complete this round
         {
             if(rowrounds==colrounds)
             {
-                printf("Will wait for rowrounds to complete\n");
-                pthread_cond_wait(&cond1, &mutex1);
+                // wait for ith rowshift to start ith colshift
+                pthread_cond_wait(&row_cond, &mutex1);
             }
             else
             {
-                printf("Will wait for colrounds to complete\n");
-                pthread_cond_wait(&cond2, &mutex1);
+                // wait for ith colshift to start i+1 th rowshift
+                pthread_cond_wait(&col_cond, &mutex1);
             }
         }
         pthread_mutex_unlock(&mutex1);
@@ -146,6 +141,8 @@ void *start_routine(void *param)
 int main(int argc, char* argv[])
 {
     int i, j;
+    if(argc > 1) details = 1;
+
     printf("+--- Enter n : ");
     scanf("%d",&n );
     printf("+--- Enter %d*%d array\n",n,n);
@@ -156,11 +153,13 @@ int main(int argc, char* argv[])
             scanf("%d",&a[i][j] );
         }
     }
-    printArr();
+    printArr("");
 
     printf("+--- Enter k and x : "); // Assuming x < n is given
     scanf("%d%d",&k,&x);
-    if(x>n || x<0 || k < 0)
+    if(k>n) printf("Reducing %d to %d since after %d shifts, matrix regains content\n", k, k%n, n);
+    k = k%n;
+    if(x>n || x<0 || k < 0 || n > MAX)
     {
         printf("+--- Incorrect parameters! Exitting\n");
         exit(0);
@@ -168,8 +167,8 @@ int main(int argc, char* argv[])
 
     // initialize mutex and condition
     pthread_mutex_init(&mutex1, NULL);
-    pthread_cond_init(&cond1, NULL);
-    pthread_cond_init(&cond2, NULL);
+    pthread_cond_init(&row_cond, NULL);
+    pthread_cond_init(&col_cond, NULL);
     thread_data param[x];
 
     // creating the threads - one rotation
@@ -187,11 +186,11 @@ int main(int argc, char* argv[])
 
     pthread_mutex_lock(&mutex1);
     printf("+--- After %d shifts\n",k);
-    printArr();
+    printArr("");
     pthread_mutex_unlock(&mutex1);
 
     // Clean up the thread vars
     pthread_mutex_destroy(&mutex1);
-    pthread_cond_destroy(&cond1);
-    pthread_cond_destroy(&cond2);
+    pthread_cond_destroy(&row_cond);
+    pthread_cond_destroy(&col_cond);
 }

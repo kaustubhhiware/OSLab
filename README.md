@@ -12,3 +12,6 @@ Codes for OS Lab
 ## Assgn 3
 * Producer Consumer problem with shared memory & semaphores **producer_consumer.c**
 * Update and query on a server (Reader Writer problem) **X.c** & **Y.c**
+
+## Assgn 4
+* Perform rowshifts and colshifts on matrix using threads **shuffle.c**
