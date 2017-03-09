@@ -1,0 +1,4 @@
+[cli]
+bears = SpaceConsistencyBear
+files = */*.c
+use_spaces = True

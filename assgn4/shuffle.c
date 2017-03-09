@@ -8,6 +8,9 @@
 * Assignment 4 part 1
 * 14CS30011 : Hiware Kaustubh Narendra
 */
+/*
+* perform rowshift and column shift on n*n matrix
+*/
 // run with -
 //  gcc -pthread shuffle.c
 // ./a.out 1 prints intermediate matrices as well

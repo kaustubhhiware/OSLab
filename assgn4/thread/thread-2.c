@@ -1,6 +1,8 @@
 
 /***
 Program to illustarte the the use of condition variables
+
+Assuming threads are created as JOINABLE by default
 ***/
 
 #include <stdio.h>

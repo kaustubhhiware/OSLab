@@ -103,10 +103,10 @@ int main(int argc, char* argv[])
     while(!feof(fp))
     {
         fscanf(fp ,"%s" ,students[i].first);
-		fscanf(fp ,"%s" ,students[i].last);
-		fscanf(fp ,"%d" ,&students[i].roll);
-		fscanf(fp ,"%f" ,&students[i].cgpa);
-		i++;
+        fscanf(fp ,"%s" ,students[i].last);  // Ignore SpaceConsistencyBear
+        fscanf(fp ,"%d" ,&students[i].roll);
+        fscanf(fp ,"%f" ,&students[i].cgpa);
+        i++;
     }
     fclose(fp);
     int *delta, *users, *num;

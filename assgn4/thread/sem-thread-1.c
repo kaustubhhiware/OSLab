@@ -1,9 +1,9 @@
 
 /***
-Simple program to illustrate the use of pthreads (Creation, Joining,
-Exit, Mutex)
-
-Assuming threads are created as JOINABLE by default
+Simple program to illustrate the use of posix semaphore
+(unnamed semaphores, shared between threads of the same process
+just as a global variable is. To share between processes, need 
+to put in shared memory)
 ***/
 
 
@@ -11,7 +11,7 @@ Assuming threads are created as JOINABLE by default
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
-#include <pthread.h>
+#include <semaphore.h>
 
 #define NUM_THREADS 5
 
@@ -22,7 +22,8 @@ struct thread_data {
 int global_count = 0;
 
 pthread_t thread_id[NUM_THREADS];
-pthread_mutex_t mutex1;
+
+sem_t mutex_sem;
 
 
 // Function executed by all threads created
@@ -33,11 +34,13 @@ void *thread_start(void *param)
 	int tid = (*t_param).t_index;
 
 	// Update global count inside critical section
-	pthread_mutex_lock(&mutex1);
+	sem_wait(&mutex_sem);
 	global_count++;
-	pthread_mutex_unlock(&mutex1);
+	// put a sleep to test that others actually wait
+	sleep(2);
+	sem_post(&mutex_sem);
 
-	// Print success and exit. Actually should not print
+	// Print success and exit. Actually should not print 
 	// thread id with %ld, but ok here as the types match in Linux
 	printf("Thread  %ld finished updating\n", thread_id[tid]);
 	pthread_exit(NULL);
@@ -48,9 +51,9 @@ int main()
 {
 	int no_of_threads, i, id;
 	struct thread_data param[NUM_THREADS];
-
-	// initialize mutex
-	pthread_mutex_init(&mutex1, NULL);
+	
+	// initialize semaphore to 1
+	sem_init(&mutex_sem, 0, 1);
 
 	// Create the threads
 	for(i=0; i<NUM_THREADS; i++)
@@ -70,10 +73,15 @@ int main()
 	// there can be other threads accessing it other than the ones
 	// this process waits for
 
-	pthread_mutex_lock(&mutex1);
+	sem_wait(&mutex_sem);
 	printf("Final Count is %d\n", global_count);
-	pthread_mutex_unlock(&mutex1);
+	sem_post(&mutex_sem);
 
 	// Clean up the mutex
-	pthread_mutex_destroy(&mutex1);
-}
+	sem_destroy(&mutex_sem);
+} 
+
+	
+	
+	 
+
