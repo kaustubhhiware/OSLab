@@ -13,7 +13,6 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <time.h>
-#include <signal.h>
 /*
 * Assignment 4 part 2
 * 14CS30011 : Hiware Kaustubh Narendra
@@ -32,10 +31,8 @@
 void minus1_error(const char* , int , int*);
 void didBstop();
 
-int shmb, shmq, shmin, shmout, full, empty, mutex;
-// are all shms required
-key_t keyb = 0;
-key_t keyq = 1;
+int shmq, shmin, full, empty, mutex;
+key_t keyq = 1; // Agrees with the keys of B
 key_t keyi = 2;
 key_t keyo = 3;
 key_t keyf = 10;
@@ -45,8 +42,6 @@ key_t keym = 12;
 int main(int argc, char* argv[])
 {
     srand(time(NULL));
-    int *isBrunning;
-
     didBstop(); // exit if B not active
 
     // initialize sembufs
@@ -57,11 +52,9 @@ int main(int argc, char* argv[])
     vop.sem_op = 1 ;    // value added to semaphore
 
     // shmq is our queue
-    shmb = shmget(keyb, sizeof(int), 0777|IPC_CREAT);
     shmq = shmget(keyq, 10*sizeof(int), 0777|IPC_CREAT);
     shmin = shmget(keyi, sizeof(int), 0777|IPC_CREAT);
-    shmout = shmget(keyo, sizeof(int), 0777|IPC_CREAT);
-    minus1_error("Error in shmget", 4, (int[]){ shmb, shmq, shmin, shmout });
+    minus1_error("Error in shmget", 2, (int[]){ shmq, shmin });
 
     // create semaphores as indicatives for full, empty and operative buffer
     full = semget(keyf, 1, 0777|IPC_CREAT);
@@ -74,17 +67,13 @@ int main(int argc, char* argv[])
     int c3 = semctl(mutex, 0, SETVAL, 1);
     minus1_error("Error in semctl(SETVAL)", 3, (int[]){ c1, c2, c3 });
 
-    isBrunning = (int *) shmat(shmb, 0, 0 );
-    int *q, *in, *out;
+    int *q, *in;
     q = (int *) shmat(shmq, 0, 0);
     in = (int *) shmat(shmin, 0, 0);
-// can out be removed
-    out = (int *) shmat(shmout, 0, 0);
-    minus1_error("Error in shmat", 3, (int[]){ *q, *in, *out });
+    minus1_error("Error in shmat", 2, (int[]){ *q, *in });
 
     while(1)
     {
-        // if(isBrunning[0]==1) break; // No point in letting A live anymore
         didBstop();
         sleep(rand()%3); // sleep for 0 - 2 s
         int request = rand()%11 - 5; // in -5 to +5
@@ -93,31 +82,27 @@ int main(int argc, char* argv[])
         P(mutex);
 
         // add number to queue, this is a request
-        q[in[0]] = request;
-        printf("+--- Request : %d\n", q[in[0]]);
-        in[0] = (in[0] + 1) % 10;
+        q[*in] = request;
+        printf("+--- Request : %d\n", q[*in]);
+        *in = (*in + 1) % 10;
 
         V(mutex);
         V(full);
     }
 
     // get rid of sems and shms
-    c1 = shmdt(isBrunning);
-    c2 = shmdt(q);
-    c3 = shmdt(in);
-    int c4 = shmdt(out);
-    minus1_error("Error in shmdt", 4, (int[]){ c1, c2, c3, c4 });
+    c1 = shmdt(q);
+    c2 = shmdt(in);
+    minus1_error("Error in shmdt", 2, (int[]){ c1, c2 });
 
     c1 = semctl(full, 0, IPC_RMID, 0);
     c2 = semctl(empty, 0, IPC_RMID, 0);
     c3 = semctl(mutex, 0, IPC_RMID, 0);
     minus1_error("Error in semctl", 3, (int[]){ c1, c2, c3 });
 
-    c1 = shmctl(shmb, IPC_RMID, 0);
-    c2 = shmctl(shmq, IPC_RMID, 0);
-    c3 = shmctl(shmin, IPC_RMID, 0);
-    c4 = shmctl(shmout, IPC_RMID, 0);
-    minus1_error("Error in shmctl", 4, (int[]){ c1, c2, c3, c4 });
+    c1 = shmctl(shmq, IPC_RMID, 0);
+    c2 = shmctl(shmin, IPC_RMID, 0);
+    minus1_error("Error in shmctl", 2, (int[]){ c1, c2 });
 
 }
 
