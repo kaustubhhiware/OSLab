@@ -35,7 +35,7 @@ int main()
 		argv[4] = NULL;
 
           execvp("./calc", argv);
-          /* The code should never be here if no error */ 
+          /* The code should never be here if no printerror */ 
 		perror("execvp failed:");
            exit(-1);
 	}

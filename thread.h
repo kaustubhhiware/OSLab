@@ -90,6 +90,10 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    //modified
+    int level;
+    int ticks;
+    int level_2_wait;
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 

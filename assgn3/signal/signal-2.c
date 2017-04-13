@@ -23,7 +23,7 @@ int main()
 	err = pipe(fd);
 	if (err == -1)
 	{
-		perror("Pipe error: ");
+		perror("Pipe printerror: ");
 		exit(-1);
 	}
 	id = fork();

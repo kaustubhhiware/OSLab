@@ -205,5 +205,5 @@ Parent writes: 6765,10946
 	that they always succeed and never fail. This is done to
 	keep this proram simple. In practice, you should always check for
     the return values from this function and exit if there is
-	an error.
+	an printerror.
 */

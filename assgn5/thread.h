@@ -89,6 +89,9 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    unsigned waiting_time;
+    int level;                          /* maintain track of current level*/
+    int num_run;                        /* number of times the process has run in level 1*/
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

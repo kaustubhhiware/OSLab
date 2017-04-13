@@ -58,7 +58,7 @@ int main(int argc,char* argv[])
     int pipe2 = pipe(fe);
     if(pipe1 == -1 || pipe2 == -1)
     {
-        perror("\n+--- Pipe error : ");
+        perror("\n+--- Pipe printerror : ");
         exit(1);
     }
 

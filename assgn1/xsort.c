@@ -47,7 +47,7 @@ int main(int argc,char* argv[])
         // open xterm and hold until user exits with Ctrl+C
         ret = execl("/usr/bin/xterm", "/usr/bin/xterm", "-hold", "-e",loc_sort,filename, (void*)NULL);
 
-        // in case of error , print
+        // in case of printerror , print
         perror("Execl failed :/ \n");
         exit(-1);
     }

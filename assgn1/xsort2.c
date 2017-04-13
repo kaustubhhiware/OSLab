@@ -53,7 +53,7 @@ int main(int argc,char* argv[])
         // open xterm and hold until user exits with Ctrl+C
         ret = execvp(cmd,args);
 
-        // in case of error , print
+        // in case of printerror , print
         perror("Execvp failed :/ \n");
         exit(-1);
     }

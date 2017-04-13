@@ -41,7 +41,7 @@ pthread_mutex_t mutex1;
 pthread_cond_t cond1;
 
 void closeandexit();
-// 2 error functions because sem+shm have different errors from pthreads
+// 2 printerror functions because sem+shm have different errors from pthreads
 void non0_error(const char* , int , int*);
 void minus1_error(const char* , int , int*);
 

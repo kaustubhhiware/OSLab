@@ -52,21 +52,29 @@ struct arena
     unsigned magic;             /* Always set to ARENA_MAGIC. */
     struct desc *desc;          /* Owning descriptor, null for big block. */
     size_t free_cnt;            /* Free blocks; pages in big block. */
+    struct list_elem free_elem;
   };
 
 /* Free block. */
 struct block
   {
+    uint8_t level;
+    uint8_t occupied;
     struct list_elem free_elem; /* Free list element. */
   };
+
+struct lock lock;
 
 /* Our set of descriptors. */
 static struct desc descs[10];   /* Descriptors. */
 static size_t desc_cnt;         /* Number of descriptors. */
 
 static struct arena *block_to_arena (struct block *);
-static struct block *arena_to_block (struct arena *, size_t idx);
-
+static struct block *arena_to_block (struct arena *);//, size_t idx);
+static struct list alist;
+static bool smaller_block(const struct block * b1,const struct block * b2,void * aux);
+static struct block * malloc_recursive(struct block * p,unsigned int hash);
+static long int pow(int base, int power);
 /* Initializes the malloc() descriptors. */
 void
 malloc_init (void)
@@ -77,79 +85,80 @@ malloc_init (void)
     {
       struct desc *d = &descs[desc_cnt++];
       ASSERT (desc_cnt <= sizeof descs / sizeof *descs);
-      d->block_size = block_size;
-      d->blocks_per_arena = (PGSIZE - sizeof (struct arena)) / block_size;
+
       list_init (&d->free_list);
-      lock_init (&d->lock);
+      list_init(&alist);
+      lock_init (&lock);
     }
 }
 
 /* Obtains and returns a new block of at least SIZE bytes.
    Returns a null pointer if memory is not available. */
-void *
-malloc (size_t size)
+void * malloc (size_t size)
 {
-  struct desc *d;
   struct block *b;
   struct arena *a;
 
   /* A null pointer satisfies a request for 0 bytes. */
   if (size == 0)
     return NULL;
-
-  /* Find the smallest descriptor that satisfies a SIZE-byte
-     request. */
-  for (d = descs; d < descs + desc_cnt; d++)
-    if (d->block_size >= size)
+  size += 2 * sizeof(char);
+  unsigned int hash;
+  for (hash = 0; hash < 7; hash++)
+    if (1 << (hash + 4) >= size)
       break;
-  if (d == descs + desc_cnt)
+  if (hash == 7)
     {
-      /* SIZE is too big for any descriptor.
-         Allocate enough pages to hold SIZE plus an arena. */
       size_t page_cnt = DIV_ROUND_UP (size + sizeof *a, PGSIZE);
       a = palloc_get_multiple (0, page_cnt);
       if (a == NULL)
         return NULL;
-
-      /* Initialize the arena to indicate a big block of PAGE_CNT
-         pages, and return it. */
       a->magic = ARENA_MAGIC;
-      a->desc = NULL;
-      a->free_cnt = page_cnt;
-      return a + 1;
+      list_push_front(&alist,&a->free_elem);
+      b = arena_to_block(a);
+      b->level = 7;
+      b->occupied = 1;
+      b = (void * )((char *)b + 2);
+      // return a pointer just above stack
+      return b;
     }
 
-  lock_acquire (&d->lock);
+  lock_acquire (&lock);
+  unsigned int hash_value = hash;
 
-  /* If the free list is empty, create a new arena. */
-  if (list_empty (&d->free_list))
+  // check for a bigger block if none are empty
+  while (list_empty (&(descs[hash].free_list)) && hash < 7)
     {
-      size_t i;
-
-      /* Allocate a page. */
-      a = palloc_get_page (0);
-      if (a == NULL)
-        {
-          lock_release (&d->lock);
-          return NULL;
-        }
-
-      /* Initialize arena and add its blocks to the free list. */
-      a->magic = ARENA_MAGIC;
-      a->desc = d;
-      a->free_cnt = d->blocks_per_arena;
-      for (i = 0; i < d->blocks_per_arena; i++)
-        {
-          struct block *b = arena_to_block (a, i);
-          list_push_back (&d->free_list, &b->free_elem);
-        }
+      hash++;
     }
 
-  /* Get a block from free list and return it. */
-  b = list_entry (list_pop_front (&d->free_list), struct block, free_elem);
-  a = block_to_arena (b);
-  a->free_cnt--;
-  lock_release (&d->lock);
+  if (hash == 7) // allocate a new page
+  {
+    a = palloc_get_page(0);
+    if (a == NULL)
+      {
+        lock_release (&lock);
+        return NULL;
+      }
+    a->magic = ARENA_MAGIC;
+    list_push_back(&alist,&a->free_elem);
+    b = arena_to_block(a);
+  } else
+  {
+    b = list_entry (list_pop_front (&(descs[hash].free_list)), struct block, free_elem);
+  }
+  struct block * lower;
+  while(hash_value != hash) {
+    lower = malloc_recursive(b, hash - 1);
+    lower->level = hash-1;
+    lower->occupied = 0;
+    list_insert_ordered(&(descs[hash-1].free_list),&lower->free_elem,smaller_block,NULL);
+    hash--;
+  }
+  b->level = hash_value;
+  b->occupied = 1;
+  b = (void * )((char *)b + 2);
+  lock_release(&lock);
   return b;
 }
 
@@ -178,11 +187,12 @@ calloc (size_t a, size_t b)
 static size_t
 block_size (void *block)
 {
-  struct block *b = block;
+  struct block *b = (struct block *)((char *)block - 2);
   struct arena *a = block_to_arena (b);
   struct desc *d = a->desc;
 
-  return d != NULL ? d->block_size : PGSIZE * a->free_cnt - pg_ofs (block);
+  int current_level = b->level;
+  return 1 << (current_level + 4);
 }
 
 /* Attempts to resize OLD_BLOCK to NEW_SIZE bytes, possibly
@@ -204,7 +214,8 @@ realloc (void *old_block, size_t new_size)
       void *new_block = malloc (new_size);
       if (old_block != NULL && new_block != NULL)
         {
-          size_t old_size = block_size (old_block);
+          size_t old_size = block_size (old_block) - 2;
+          // reducing storage space
           size_t min_size = new_size < old_size ? new_size : old_size;
           memcpy (new_block, old_block, min_size);
           free (old_block);
@@ -220,46 +231,36 @@ free (void *p)
 {
   if (p != NULL)
     {
+      p = (char *) p -  2;
       struct block *b = p;
       struct arena *a = block_to_arena (b);
       struct desc *d = a->desc;
 
-      if (d != NULL)
-        {
-          /* It's a normal block.  We handle it here. */
+      lock_acquire (&lock);
+      // printf("%u is the buddy of %u\n",buddy,b);
 
-#ifndef NDEBUG
-          /* Clear the block to help detect use-after-free bugs. */
-          memset (b, 0xcc, d->block_size);
-#endif
+      struct block * top = malloc_recursive(b, b->level);
 
-          lock_acquire (&d->lock);
+      while (top->level == b->level && !top->occupied){
+        list_remove(&(top->free_elem));
 
-          /* Add block to free list. */
-          list_push_front (&d->free_list, &b->free_elem);
+        if (top < b)
+          b = top;
+        b->level += 1;
+        if (b->level == 7) break;
 
-          /* If the arena is now entirely unused, free it. */
-          if (++a->free_cnt >= d->blocks_per_arena)
-            {
-              size_t i;
-
-              ASSERT (a->free_cnt == d->blocks_per_arena);
-              for (i = 0; i < d->blocks_per_arena; i++)
-                {
-                  struct block *b = arena_to_block (a, i);
-                  list_remove (&b->free_elem);
-                }
-              palloc_free_page (a);
-            }
-
-          lock_release (&d->lock);
-        }
-      else
-        {
-          /* It's a big block.  Free its pages. */
-          palloc_free_multiple (a, a->free_cnt);
-          return;
-        }
+        top = malloc_recursive(b,b->level);
+      }
+      if ( b->level >= 7 ) {
+        a = block_to_arena(b);
+        list_remove(&a->free_elem);
+        palloc_free_page(a);
+      }
+      else{
+        b->occupied = 0;
+        list_insert_ordered (&(descs[b->level].free_list),&b->free_elem,smaller_block,NULL);
+      }
+      lock_release (&lock);
     }
 }
 
@@ -272,23 +273,56 @@ block_to_arena (struct block *b)
   /* Check that the arena is valid. */
   ASSERT (a != NULL);
   ASSERT (a->magic == ARENA_MAGIC);
-
-  /* Check that the block is properly aligned for the arena. */
-  ASSERT (a->desc == NULL
-          || (pg_ofs (b) - sizeof *a) % a->desc->block_size == 0);
-  ASSERT (a->desc != NULL || pg_ofs (b) == sizeof *a);
-
+  ASSERT ((pg_ofs(b) - sizeof *a)%16==0);
   return a;
 }
 
 /* Returns the (IDX - 1)'th block within arena A. */
 static struct block *
-arena_to_block (struct arena *a, size_t idx)
+arena_to_block (struct arena *a)//, size_t idx)
 {
   ASSERT (a != NULL);
   ASSERT (a->magic == ARENA_MAGIC);
-  ASSERT (idx < a->desc->blocks_per_arena);
-  return (struct block *) ((uint8_t *) a
-                           + sizeof *a
-                           + idx * a->desc->block_size);
+  return (struct block *) ((uint8_t *) a + sizeof *a);
 }
+
+void printMemory()
+{
+  int i,j=0;
+  struct list_elem * l;
+  printf("------------------------------------------------------------------------------\n");
+  if (list_empty(&alist))
+    printf("No free blocks\n");
+  else
+    for (l = list_begin(&alist); l != list_end(&alist); l = list_next(l)){
+      printf("\nPage %d : \n",j++);
+      struct arena *a = list_entry(l, struct arena, free_elem);
+      printf("Page address = %u \n",(unsigned int) a);
+      for(i = 0; i < 7; i++)
+      {
+          struct list_elem *e;
+
+          printf("\tSize %d:",1 << ( i + 4) );
+          for (e = list_begin (&descs[i].free_list); e != list_end (&descs[i].free_list);e = list_next (e))
+          {
+            struct block *b = list_entry (e, struct block, free_elem);
+            if (a == block_to_arena(b))
+              printf("%u  ",(unsigned int)b);
+
+          }
+          printf("\n");
+      }
+    }
+  printf("No. of pages allocated: %d\n", j);
+  printf("------------------------------------------------------------------------------\n\n");
+}
+
+bool smaller_block(const struct block * b1,const struct block * b2,void * aux){
+  return ((uintptr_t)b1 < (uintptr_t)b2);
+}
+
+struct block * malloc_recursive(struct block * p,unsigned int hash)
+  {
+      struct block * b = arena_to_block(block_to_arena(p));
+      return (struct block *)((((uintptr_t) p - (uintptr_t) b)^(1 << ( hash + 4))) + (uintptr_t) b);
+  }
