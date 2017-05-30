@@ -15,7 +15,7 @@
 #include <assert.h>
 /*
 * Assignment 4 part 2
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 /*
 * B is the consumer - recieves requests

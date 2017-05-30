@@ -8,7 +8,7 @@
 #define MAX 1000 // maximum number of elements in the array
 /*
 * Assignment 1 part 1
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 /* scan array of integers from file and find if a number exists in it
 *  by creating 2 child processes which search linearly in subarrays of size 10

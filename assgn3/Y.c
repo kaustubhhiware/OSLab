@@ -11,7 +11,7 @@
 #include <errno.h>
 /*
 * Assignment 3 part 2
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 
 /* Querying process to do this :

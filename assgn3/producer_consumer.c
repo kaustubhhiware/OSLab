@@ -9,7 +9,7 @@
 #include <stdbool.h>
 /*
 * Assignment 3 part 1
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 /* shared circular buffers
 *  m - producer, n - consumer problem

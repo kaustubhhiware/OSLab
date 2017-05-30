@@ -12,7 +12,7 @@
 #define MAX 200
 /*
 * Assignment 3 part 2
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 
 // view shm -  ipcs -m

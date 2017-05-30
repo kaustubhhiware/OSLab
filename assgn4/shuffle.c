@@ -6,7 +6,7 @@
 #define MAX 100
 /*
 * Assignment 4 part 1
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 /*
 * perform rowshift and column shift on n*n matrix

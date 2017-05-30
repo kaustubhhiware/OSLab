@@ -1,5 +1,5 @@
-#include<stdlib.h>
-#include<stdio.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
@@ -10,7 +10,7 @@
 #define BUFSIZE 100
 /*
 * Assignment 2 part 1 - fcopy.c
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 /* copy from one file to the other using pipes
 */

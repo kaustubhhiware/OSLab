@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 /*
 * Assignment 2 part 2 - run.c
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 /* execute our shell process from shell.c
 */

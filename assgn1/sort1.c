@@ -3,7 +3,7 @@
 #define MAX 1000 // maximum number of elements in the array
 /*
 * Assignment 1 part 2 - sort1.c
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 */
 /* take filename as a command line parameter and read array of integers from it
 * print the sorted array using mergesort

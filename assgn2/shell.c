@@ -21,7 +21,7 @@
 // colour guide - https://github.com/shiena/ansicolor/blob/master/README.md
 /*
 * Assignment 2 part 2 - shell.c
-* 14CS30011 : Hiware Kaustubh Narendra
+* written by @kaustubhhiware as a part of OS Lab
 * Usage - make clean ; clear ; make ; ./Cshell
 */
 /* implement shell functions
